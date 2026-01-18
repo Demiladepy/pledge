@@ -43,9 +43,9 @@ npm install
 npm run deploy:base-sepolia
 ```
 
-**📖 See [pledgeagent/README.md](pledgeagent/README.md) for complete documentation.**
+** See [pledgeagent/README.md](pledgeagent/README.md) for complete documentation.**
 
-## 📁 Project Structure
+##  Project Structure
 
 ```
 pledgeagent/
@@ -71,7 +71,7 @@ pledgeagent/
 └── README.md                 # This file
 ```
 
-## 🏗️ Architecture
+##  Architecture
 
 ```
 Frontend (React) → Backend (FastAPI) → Agent Brain
@@ -82,33 +82,33 @@ Frontend (React) → Backend (FastAPI) → Agent Brain
                    → Smart Contract (Base L2)
 ```
 
-## ✨ Features
+##  Features
 
 ### Backend
-- ✅ **Agent Brain** - Autonomous decision-making
-- ✅ **GPT-4o Vision** - Multimodal proof verification
-- ✅ **Fraud Detection** - Learning-based pattern matching
-- ✅ **Behavioral Adaptation** - Adjusts stakes based on patterns
-- ✅ **Opik Integration** - Full observability
-- ✅ **Web3 Integration** - On-chain verification recording
+-  **Agent Brain** - Autonomous decision-making
+-  **GPT-4o Vision** - Multimodal proof verification
+-  **Fraud Detection** - Learning-based pattern matching
+-  **Behavioral Adaptation** - Adjusts stakes based on patterns
+-  **Opik Integration** - Full observability
+-  **Web3 Integration** - On-chain verification recording
 
 ### Frontend
-- ✅ **4 Complete Pages** - Home, Create Goal, Submit Proof, Dashboard
-- ✅ **8 Reusable Components** - Button, Card, Input, etc.
-- ✅ **TypeScript** - 100% type coverage
-- ✅ **Tailwind CSS** - Responsive design
-- ✅ **GSAP Animations** - Smooth transitions
-- ✅ **Production Build** - Optimized to 116 KB gzipped
+-  **4 Complete Pages** - Home, Create Goal, Submit Proof, Dashboard
+-  **8 Reusable Components** - Button, Card, Input, etc.
+-  **TypeScript** - 100% type coverage
+-  **Tailwind CSS** - Responsive design
+-  **GSAP Animations** - Smooth transitions
+-  **Production Build** - Optimized to 116 KB gzipped
 
 ### Smart Contract
-- ✅ **PledgeEscrow** - Secure stake locking
-- ✅ **Base L2 Deployment** - Low gas costs (~$0.01/tx)
-- ✅ **Agent Authorization** - Backend can record verifications
-- ✅ **Emergency Withdrawal** - User protection
-- ✅ **Platform Fee** - 2% (capped at 5%)
-- ✅ **Full Test Suite** - 9 comprehensive tests
+-  **PledgeEscrow** - Secure stake locking
+-  **Base L2 Deployment** - Low gas costs (~$0.01/tx)
+-  **Agent Authorization** - Backend can record verifications
+-  **Emergency Withdrawal** - User protection
+-  **Platform Fee** - 2% (capped at 5%)
+-  **Full Test Suite** - 9 comprehensive tests
 
-## 📖 Documentation
+##  Documentation
 
 | Document | Description |
 |----------|-------------|
@@ -119,7 +119,7 @@ Frontend (React) → Backend (FastAPI) → Agent Brain
 | [pledgeagent/contracts/DEPLOYMENT.md](pledgeagent/contracts/DEPLOYMENT.md) | Contract deployment |
 | [pledgeagent/SMART_CONTRACT_INTEGRATION.md](pledgeagent/SMART_CONTRACT_INTEGRATION.md) | Blockchain integration |
 
-## 🧪 Testing
+##  Testing
 
 ```bash
 # Backend tests
@@ -135,7 +135,7 @@ cd pledgeagent/frontend
 npm test
 ```
 
-## 💰 Cost Estimates
+##  Cost Estimates
 
 **Per 1000 Verifications:**
 - OpenAI API: ~$2-3
@@ -149,9 +149,9 @@ npm test
 - Frontend: Free (Vercel)
 - **Total: ~$30/month**
 
-## 🎯 Current Status
+##  Current Status
 
-### ✅ Complete
+###  Complete
 - Core agent brain with decision-making
 - GPT-4o Vision verification
 - Fraud detection system
@@ -162,20 +162,17 @@ npm test
 - Web3 integration
 - Comprehensive documentation
 
-### 🚧 In Progress
+###  In Progress
 - Database persistence
 - Additional proof types
 - Real-time notifications
 
-### 📋 Planned
+###  Planned
 - Multi-user accountability pods
 - Social features
 - Mobile app
 - Production deployment
 
-## 🏆 Built For
-
-**Opik AI Agents Hackathon** - January 2026
 
 Demonstrating:
 - Autonomous agent decision-making
@@ -183,17 +180,6 @@ Demonstrating:
 - Full observability with Opik
 - Real financial stakes via smart contracts
 
-## 📧 Contact
-
-- **GitHub Issues:** [Report bugs](https://github.com/yourusername/pledgeagent/issues)
-- **Twitter:** [@pledgeagent](https://twitter.com/pledgeagent)
-- **Email:** team@pledgeagent.xyz
-
-## 📜 License
-
-MIT License - see [LICENSE](LICENSE) file
-
----
 
 **The agent doesn't ask if you went to the gym. It verifies you went. And if you didn't? It takes your money.**
 
