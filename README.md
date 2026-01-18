@@ -8,7 +8,7 @@
 
 ---
 
-## 🎯 What Is This?
+##  What Is This?
 
 92% of New Year's resolutions fail by February. **PledgeAgent** changes that with AI-enforced accountability:
 
@@ -17,7 +17,7 @@
 3. **AI verifies** using GPT-4o Vision + fraud detection
 4. **Succeed or lose** - Get your money back, or it goes to charity
 
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Clone repository
