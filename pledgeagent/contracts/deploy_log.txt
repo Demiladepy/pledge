@@ -1,0 +1,21 @@
+🚀 Starting PledgeEscrow deployment...
+
+📝 Deploying with account: 0xe7A5f0BBeA629fa2cDCb56677e843A224FC6C3Ca
+💰 Account balance: 0.0 ETH
+
+⚙️  Configuration:
+   Agent Backend: your_backend_wallet_address
+   Platform Treasury: your_treasury_wallet_address
+
+📦 Deploying PledgeEscrow contract...
+NotImplementedError: Method 'HardhatEthersProvider.resolveName' is not implemented
+    at HardhatEthersProvider.resolveName (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\@nomicfoundation\hardhat-ethers\src\internal\hardhat-ethers-provider.ts:364:11)
+    at HardhatEthersSigner.resolveName (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\@nomicfoundation\hardhat-ethers\src\signers.ts:168:26)
+    at resolveAddress (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\address\checks.ts:113:46)
+    at C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\contract\contract.ts:172:60
+    at ParamType.#walkAsync (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\abi\fragments.ts:779:24)
+    at ParamType.walkAsync (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\abi\fragments.ts:797:24)
+    at C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\contract\contract.ts:170:22
+    at Array.map (<anonymous>)
+    at resolveArgs (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\contract\contract.ts:169:37)
+    at ContractFactory.getDeployTransaction (C:\Users\User\Desktop\pledgeagent\pledgeagent\contracts\node_modules\ethers\src.ts\contract\factory.ts:90:47)
