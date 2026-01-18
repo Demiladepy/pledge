@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
+from datetime import datetime
 import os
 from dotenv import load_dotenv
 
@@ -77,6 +78,7 @@ class ProofSubmitResponse(BaseModel):
     fraud_signals: List[str]
     reasoning: str
     processing_time_ms: float
+    recommendation: Optional[str] = None
 
 
 class UserStatsResponse(BaseModel):
@@ -101,6 +103,7 @@ async def root():
     }
 
 
+@app.post("/api/goals", response_model=GoalCreateResponse)
 @app.post("/api/goals/create", response_model=GoalCreateResponse)
 async def create_goal(
     request: GoalCreateRequest,
@@ -120,7 +123,7 @@ async def create_goal(
         # TODO: Implement smart contract interaction
         # For MVP, we'll simulate this
         
-        goal_id = f"goal_{request.user_id}_{int(datetime.utcnow().timestamp())}"
+        goal_id = f"goal_{request.user_id}_{int(datetime.now().timestamp())}"
         
         # Simulate transaction
         tx_hash = "0x" + "a" * 64  # Placeholder
@@ -162,7 +165,7 @@ async def submit_proof(
             "filename": proof_image.filename,
             "content_type": proof_image.content_type,
             "size": len(image_data),
-            "timestamp": datetime.utcnow().isoformat()
+            "timestamp": datetime.now().isoformat()
         }
         
         # Process through agent brain
@@ -174,6 +177,19 @@ async def submit_proof(
             image_data=image_data,
             metadata=metadata
         )
+        
+        # Add recommendation based on verdict
+        recommendation = None
+        if result.get("verdict") == "approved":
+            recommendation = "Great job! Keep up the momentum and maintain your streak."
+        elif result.get("verdict") == "rejected":
+            recommendation = "Try submitting clearer evidence that better matches your goal description."
+        elif result.get("verdict") == "fraud_detected":
+            recommendation = "Fraud detected. Please submit authentic proof to avoid penalties."
+        else:
+            recommendation = "The evidence is unclear. Please resubmit with better quality proof."
+        
+        result["recommendation"] = recommendation
         
         return ProofSubmitResponse(**result)
         

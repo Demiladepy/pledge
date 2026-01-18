@@ -3,7 +3,7 @@ import { cn } from '../utils/cn'
 
 interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode
-  variant?: 'primary' | 'secondary' | 'success' | 'danger'
+  variant?: 'primary' | 'secondary' | 'success' | 'danger' | 'ghost'
   size?: 'sm' | 'md' | 'lg'
   isLoading?: boolean
   icon?: ReactNode
@@ -20,23 +20,31 @@ export function Button({
   ...props
 }: ButtonProps) {
   const variantClasses = {
-    primary: 'bg-primary hover:bg-blue-600 text-white',
-    secondary: 'bg-secondary hover:bg-blue-900 text-white',
-    success: 'bg-success hover:bg-green-600 text-white',
-    danger: 'bg-danger hover:bg-red-600 text-white',
+    primary:
+      'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg shadow-blue-500/50 hover:shadow-xl hover:shadow-blue-500/60',
+    secondary:
+      'bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 text-white dark:from-gray-700 dark:to-gray-800 dark:hover:from-gray-800 dark:hover:to-gray-900',
+    success:
+      'bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white shadow-lg shadow-green-500/50 hover:shadow-xl hover:shadow-green-500/60',
+    danger:
+      'bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white shadow-lg shadow-red-500/50 hover:shadow-xl hover:shadow-red-500/60',
+    ghost:
+      'bg-transparent hover:bg-gray-100 dark:hover:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-300 dark:border-gray-600',
   }
 
   const sizeClasses = {
     sm: 'px-3 py-1.5 text-sm',
-    md: 'px-4 py-2.5 text-base',
-    lg: 'px-6 py-3 text-lg',
+    md: 'px-5 py-2.5 text-base',
+    lg: 'px-7 py-3.5 text-lg',
   }
 
   return (
     <button
       className={cn(
-        'font-medium rounded-lg transition-all duration-200 inline-flex items-center gap-2',
-        'disabled:opacity-50 disabled:cursor-not-allowed',
+        'font-semibold rounded-xl transition-all duration-300 inline-flex items-center justify-center gap-2',
+        'disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none',
+        'active:scale-95 transform hover:scale-105',
+        'focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500',
         variantClasses[variant],
         sizeClasses[size],
         className,
@@ -66,7 +74,7 @@ export function Button({
           ></path>
         </svg>
       )}
-      {icon}
+      {icon && !isLoading && icon}
       {children}
     </button>
   )

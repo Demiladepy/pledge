@@ -5,10 +5,14 @@ import {
   SubmitProofPage,
   DashboardPage,
 } from './pages'
+import { ToastContainer } from './components/Toast'
+import { ToastProvider, useToast } from './contexts/ToastContext'
 
-function App() {
+function AppContent() {
+  const { toasts, removeToast } = useToast()
+
   return (
-    <Router>
+    <>
       <Routes>
         <Route path="/" element={<HomePage />} />
         <Route path="/create-goal" element={<CreateGoalPage />} />
@@ -16,6 +20,17 @@ function App() {
         <Route path="/dashboard" element={<DashboardPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <ToastContainer toasts={toasts} onClose={removeToast} />
+    </>
+  )
+}
+
+function App() {
+  return (
+    <Router>
+      <ToastProvider>
+        <AppContent />
+      </ToastProvider>
     </Router>
   )
 }

@@ -32,11 +32,14 @@ export interface ProofSubmission {
 }
 
 export interface VerificationResult {
-  verdict: 'APPROVED' | 'REJECTED'
+  verdict: 'APPROVED' | 'REJECTED' | 'UNCLEAR' | 'FRAUD_DETECTED'
   confidence: number
   message: string
   fraud_signals: string[]
-  recommendation: string
+  recommendation?: string
+  reasoning?: string
+  processing_time_ms?: number
+  blockchain_tx?: string
 }
 
 export interface UserStats {
@@ -76,7 +79,7 @@ export const proofAPI = {
     const formData = new FormData()
     formData.append('goal_id', goalId)
     formData.append('user_id', userId)
-    formData.append('image_file', imageFile)
+    formData.append('proof_image', imageFile)
 
     const response = await apiClient.post<VerificationResult>(
       '/api/proof/submit',

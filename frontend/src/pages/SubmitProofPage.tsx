@@ -10,11 +10,13 @@ import { Layout } from '../components/Layout'
 import { Loader } from '../components/Loader'
 import { proofAPI, VerificationResult } from '../utils/api'
 import { Link } from 'react-router-dom'
+import { useToast } from '../contexts/ToastContext'
 
 export function SubmitProofPage() {
   const formRef = useRef<HTMLDivElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
   const dragRef = useRef<HTMLDivElement>(null)
+  const toast = useToast()
 
   const [isDragging, setIsDragging] = useState(false)
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -83,17 +85,22 @@ export function SubmitProofPage() {
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      setError('Please select a valid image file (PNG, JPG, etc.)')
+      const errorMsg = 'Please select a valid image file (PNG, JPG, etc.)'
+      setError(errorMsg)
+      toast.error(errorMsg)
       return
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      setError('Image size must be less than 10MB')
+      const errorMsg = 'Image size must be less than 10MB'
+      setError(errorMsg)
+      toast.error(errorMsg)
       return
     }
 
     setImageFile(file)
     setError(null)
+    toast.info('Image loaded successfully')
 
     // Create preview
     const reader = new FileReader()
@@ -152,12 +159,23 @@ export function SubmitProofPage() {
         imageFile!,
       )
       setResult(verificationResult)
+      
+      if (verificationResult.verdict === 'APPROVED') {
+        toast.success(`Proof approved! ${(verificationResult.confidence * 100).toFixed(0)}% confidence.`)
+      } else if (verificationResult.verdict === 'REJECTED') {
+        toast.error('Proof rejected. Please try again with better evidence.')
+      } else if (verificationResult.verdict === 'FRAUD_DETECTED') {
+        toast.error('Fraud detected. Submission rejected.')
+      } else {
+        toast.warning('Unclear evidence. Please resubmit with clearer proof.')
+      }
     } catch (err) {
-      setError(
+      const errorMessage =
         err instanceof Error
           ? err.message
-          : 'Failed to submit proof. Please try again.',
-      )
+          : 'Failed to submit proof. Please try again.'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -204,7 +222,12 @@ export function SubmitProofPage() {
 
               <Alert type={isApproved ? 'success' : 'error'}>
                 <p className="text-lg font-semibold mb-2">{result.message}</p>
-                <p className="text-sm mt-2">{result.recommendation}</p>
+                {result.recommendation && (
+                  <p className="text-sm mt-2">{result.recommendation}</p>
+                )}
+                {result.reasoning && (
+                  <p className="text-xs mt-2 opacity-75 italic">{result.reasoning}</p>
+                )}
               </Alert>
 
               {result.fraud_signals.length > 0 && (
@@ -279,11 +302,11 @@ export function SubmitProofPage() {
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-lg p-8 text-center transition-all cursor-pointer ${
+                  className={`border-2 border-dashed rounded-xl p-8 md:p-12 text-center transition-all cursor-pointer ${
                     isDragging
-                      ? 'border-primary bg-blue-50'
-                      : 'border-gray-300 hover:border-gray-400'
-                  } ${errors.image ? 'border-danger' : ''}`}
+                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-105'
+                      : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
+                  } ${errors.image ? 'border-red-500 dark:border-red-500' : ''}`}
                 >
                   <input
                     type="file"
@@ -293,12 +316,21 @@ export function SubmitProofPage() {
                     id="image-input"
                   />
                   <label htmlFor="image-input" className="cursor-pointer">
-                    <IoCloudUpload className="w-12 h-12 text-gray-400 mx-auto mb-2" />
-                    <p className="font-semibold text-gray-900">
+                    <IoCloudUpload
+                      className={`w-16 h-16 mx-auto mb-4 transition-colors ${
+                        isDragging
+                          ? 'text-blue-500'
+                          : 'text-gray-400 dark:text-gray-500'
+                      }`}
+                    />
+                    <p className="font-semibold text-gray-900 dark:text-white text-lg">
                       Drag and drop your image here
                     </p>
-                    <p className="text-sm text-gray-500 mt-1">
+                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
                       or click to select a file
+                    </p>
+                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
+                      Supports PNG, JPG, WEBP (max 10MB)
                     </p>
                   </label>
                 </div>

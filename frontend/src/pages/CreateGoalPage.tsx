@@ -9,6 +9,7 @@ import { Alert } from '../components/Alert'
 import { Layout } from '../components/Layout'
 import { goalAPI, Goal } from '../utils/api'
 import { Link } from 'react-router-dom'
+import { useToast } from '../contexts/ToastContext'
 
 export function CreateGoalPage() {
   const formRef = useRef<HTMLDivElement>(null)
@@ -16,6 +17,7 @@ export function CreateGoalPage() {
   const [success, setSuccess] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [goalId, setGoalId] = useState<string | null>(null)
+  const toast = useToast()
 
   const [formData, setFormData] = useState({
     user_id: 'user_' + Math.random().toString(36).substr(2, 9),
@@ -96,6 +98,7 @@ export function CreateGoalPage() {
       const response = await goalAPI.create(goal)
       setGoalId(response.goal_id)
       setSuccess(true)
+      toast.success(`Goal created! $${formData.stake_amount} locked.`)
 
       // Animate success state
       if (formRef.current) {
@@ -107,9 +110,10 @@ export function CreateGoalPage() {
         })
       }
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : 'Failed to create goal. Please try again.',
-      )
+      const errorMessage =
+        err instanceof Error ? err.message : 'Failed to create goal. Please try again.'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
       setIsLoading(false)
     }
@@ -171,8 +175,10 @@ export function CreateGoalPage() {
         <div ref={formRef}>
           <Card>
             <CardHeader>
-              <h1 className="text-3xl font-bold text-gray-900">Create a New Goal</h1>
-              <p className="text-gray-600 mt-2">
+              <h1 className="text-3xl md:text-4xl font-bold text-gray-900 dark:text-white">
+                Create a New Goal
+              </h1>
+              <p className="text-gray-600 dark:text-gray-300 mt-2">
                 Define your goal and stake cryptocurrency to stay accountable.
               </p>
             </CardHeader>
