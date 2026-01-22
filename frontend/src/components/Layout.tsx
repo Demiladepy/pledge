@@ -1,16 +1,15 @@
 import { ReactNode } from 'react'
 import { Link } from 'react-router-dom'
-import { IoMoon, IoSun, IoMenu, IoClose } from 'react-icons/io5'
+import { IoMoon, IoSunny, IoMenu, IoClose } from 'react-icons/io5'
 import { useState } from 'react'
 import { useTheme } from '../contexts/ThemeContext'
-import { Button } from './Button'
 
 interface LayoutProps {
   children: ReactNode
 }
 
 export function Layout({ children }: LayoutProps) {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+  const { setTheme, resolvedTheme } = useTheme()
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const toggleTheme = () => {
@@ -59,7 +58,7 @@ export function Layout({ children }: LayoutProps) {
                 aria-label="Toggle theme"
               >
                 {resolvedTheme === 'dark' ? (
-                  <IoSun className="w-5 h-5 text-yellow-500" />
+                  <IoSunny className="w-5 h-5 text-yellow-500" />
                 ) : (
                   <IoMoon className="w-5 h-5 text-gray-700" />
                 )}
