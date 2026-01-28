@@ -1,5 +1,16 @@
+/**
+ * Premium Toast Component
+ * Enhanced with Framer-like animations via GSAP and premium styling
+ */
+
 import { useEffect, useRef } from 'react'
-import { IoCheckmarkCircle, IoCloseCircle, IoInformationCircle, IoWarning } from 'react-icons/io5'
+import {
+  IoCheckmarkCircle,
+  IoCloseCircle,
+  IoInformationCircle,
+  IoWarning,
+  IoClose
+} from 'react-icons/io5'
 import { cn } from '../utils/cn'
 import gsap from 'gsap'
 
@@ -25,30 +36,55 @@ const icons = {
 }
 
 const styles = {
-  success: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-800 dark:text-green-200',
-  error: 'bg-red-50 dark:bg-red-900/20 border-red-200 dark:border-red-800 text-red-800 dark:text-red-200',
-  info: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-800 dark:text-blue-200',
-  warning: 'bg-yellow-50 dark:bg-yellow-900/20 border-yellow-200 dark:border-yellow-800 text-yellow-800 dark:text-yellow-200',
+  success: 'bg-white dark:bg-gray-900 border-success-200 dark:border-success-800 text-success-700 dark:text-success-300',
+  error: 'bg-white dark:bg-gray-900 border-error-200 dark:border-error-800 text-error-700 dark:text-error-300',
+  info: 'bg-white dark:bg-gray-900 border-info-200 dark:border-info-800 text-info-700 dark:text-info-300',
+  warning: 'bg-white dark:bg-gray-900 border-warning-200 dark:border-warning-800 text-warning-700 dark:text-warning-300',
+}
+
+const iconColors = {
+  success: 'text-success-500',
+  error: 'text-error-500',
+  info: 'text-info-500',
+  warning: 'text-warning-500',
 }
 
 export function ToastComponent({ toast, onClose }: ToastProps) {
   const ref = useRef<HTMLDivElement>(null)
+  const progressRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     const element = ref.current
+    const progress = progressRef.current
+    const duration = (toast.duration || 5000) / 1000
+
     if (element) {
       gsap.fromTo(
         element,
-        { opacity: 0, y: -20, scale: 0.95 },
-        { opacity: 1, y: 0, scale: 1, duration: 0.3, ease: 'back.out(1.7)' }
+        { opacity: 0, x: 100, scale: 0.9 },
+        {
+          opacity: 1,
+          x: 0,
+          scale: 1,
+          duration: 0.5,
+          ease: 'power4.out'
+        }
       )
     }
 
-    const timer = setTimeout(() => {
-      handleClose()
-    }, toast.duration || 5000)
-
-    return () => clearTimeout(timer)
+    if (progress) {
+      gsap.fromTo(
+        progress,
+        { scaleX: 1 },
+        {
+          scaleX: 0,
+          duration: duration,
+          ease: 'none',
+          transformOrigin: 'left',
+          onComplete: handleClose
+        }
+      )
+    }
   }, [])
 
   const handleClose = () => {
@@ -56,9 +92,10 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
     if (element) {
       gsap.to(element, {
         opacity: 0,
-        y: -20,
-        scale: 0.95,
-        duration: 0.2,
+        x: 100,
+        scale: 0.9,
+        duration: 0.3,
+        ease: 'power4.in',
         onComplete: () => onClose(toast.id),
       })
     } else {
@@ -72,21 +109,37 @@ export function ToastComponent({ toast, onClose }: ToastProps) {
     <div
       ref={ref}
       className={cn(
-        'flex items-center gap-3 p-4 rounded-xl border shadow-xl min-w-[300px] max-w-md',
-        'backdrop-blur-sm dark:backdrop-blur-md',
-        'dark:border-opacity-50',
+        'relative flex items-center gap-4 p-4 rounded-xl border-2 shadow-2xl overflow-hidden',
+        'glass-strong min-w-[320px] max-w-md',
         styles[toast.type]
       )}
     >
-      <Icon className="w-5 h-5 flex-shrink-0" />
-      <p className="flex-1 text-sm font-medium">{toast.message}</p>
+      <div className={cn('flex-shrink-0', iconColors[toast.type])}>
+        <Icon className="w-6 h-6" />
+      </div>
+
+      <p className="flex-1 text-sm font-semibold leading-snug">
+        {toast.message}
+      </p>
+
       <button
         onClick={handleClose}
-        className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+        className="flex-shrink-0 p-1 rounded-lg hover:bg-black/5 dark:hover:bg-white/5 transition-all"
         aria-label="Close toast"
       >
-        <IoCloseCircle className="w-5 h-5" />
+        <IoClose className="w-5 h-5 text-gray-400" />
       </button>
+
+      {/* Progress Bar */}
+      <div
+        ref={progressRef}
+        className={cn(
+          'absolute bottom-0 left-0 h-1 w-full',
+          toast.type === 'success' ? 'bg-success-500' :
+            toast.type === 'error' ? 'bg-error-500' :
+              toast.type === 'warning' ? 'bg-warning-500' : 'bg-info-500'
+        )}
+      />
     </div>
   )
 }
@@ -98,7 +151,7 @@ interface ToastContainerProps {
 
 export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
   return (
-    <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+    <div className="fixed top-6 right-6 z-[2000] flex flex-col gap-4 pointer-events-none">
       {toasts.map((toast) => (
         <div key={toast.id} className="pointer-events-auto">
           <ToastComponent toast={toast} onClose={onClose} />
@@ -107,6 +160,3 @@ export function ToastContainer({ toasts, onClose }: ToastContainerProps) {
     </div>
   )
 }
-
-// Toast hook is now in ToastContext.tsx
-

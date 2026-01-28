@@ -25,12 +25,16 @@ function AppContent() {
   )
 }
 
+import { ThemeProvider } from './contexts/ThemeContext'
+
 function App() {
   return (
     <Router>
-      <ToastProvider>
-        <AppContent />
-      </ToastProvider>
+      <ThemeProvider>
+        <ToastProvider>
+          <AppContent />
+        </ToastProvider>
+      </ThemeProvider>
     </Router>
   )
 }

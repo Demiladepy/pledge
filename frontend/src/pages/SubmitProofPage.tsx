@@ -1,21 +1,38 @@
+/**
+ * Premium SubmitProofPage Component
+ * Evidence submission portal with AI oracle verification
+ */
+
 import { useState, useRef, useEffect } from 'react'
 import gsap from 'gsap'
-import { IoCloudUpload, IoCheckmarkCircle, IoCloseCircle } from 'react-icons/io5'
+import {
+  IoCloudUpload,
+  IoCheckmarkCircle,
+  IoCloseCircle,
+  IoShieldCheckmark,
+  IoSearch,
+  IoAlertCircle,
+  IoSparkles,
+  IoArrowForward,
+  IoImage,
+  IoFlash,
+  IoScan,
+  IoRocket
+} from 'react-icons/io5'
 import { Button } from '../components/Button'
-import { Card, CardHeader, CardBody, CardFooter } from '../components/Card'
+import { Card, CardHeader, CardBody, CardFooter, CardTitle } from '../components/Card'
 import { Input } from '../components/Input'
 import { Alert } from '../components/Alert'
 import { Badge } from '../components/Badge'
 import { Layout } from '../components/Layout'
-import { Loader } from '../components/Loader'
 import { proofAPI, VerificationResult } from '../utils/api'
 import { Link } from 'react-router-dom'
 import { useToast } from '../contexts/ToastContext'
+import { cn } from '../utils/cn'
 
 export function SubmitProofPage() {
   const formRef = useRef<HTMLDivElement>(null)
   const resultRef = useRef<HTMLDivElement>(null)
-  const dragRef = useRef<HTMLDivElement>(null)
   const toast = useToast()
 
   const [isDragging, setIsDragging] = useState(false)
@@ -23,131 +40,57 @@ export function SubmitProofPage() {
   const [imagePreview, setImagePreview] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [result, setResult] = useState<VerificationResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
 
   const [formData, setFormData] = useState({
     goal_id: '',
-    user_id: '',
+    user_id: localStorage.getItem('userId') || '',
   })
-
-  const [errors, setErrors] = useState<Record<string, string>>({})
 
   useEffect(() => {
     if (formRef.current && !result) {
-      gsap.from(formRef.current, {
-        duration: 0.6,
+      gsap.from('.step-child', {
+        duration: 0.8,
         opacity: 0,
         y: 20,
-        ease: 'power2.out',
-      })
-    }
-  }, [result])
-
-  useEffect(() => {
-    if (resultRef.current && result) {
-      gsap.from(resultRef.current, {
-        duration: 0.6,
-        opacity: 0,
-        scale: 0.95,
-        ease: 'back.out',
+        stagger: 0.1,
+        ease: 'power4.out',
       })
     }
   }, [result])
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     setIsDragging(true)
   }
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault()
-    e.stopPropagation()
-    setIsDragging(false)
-  }
+  const handleDragLeave = () => setIsDragging(false)
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault()
-    e.stopPropagation()
     setIsDragging(false)
-
     const files = e.dataTransfer.files
-    if (files.length > 0) {
-      processFile(files[0])
-    }
+    if (files.length > 0) processFile(files[0])
   }
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      processFile(e.target.files[0])
-    }
+    if (e.target.files && e.target.files.length > 0) processFile(e.target.files[0])
   }
 
   const processFile = (file: File) => {
     if (!file.type.startsWith('image/')) {
-      const errorMsg = 'Please select a valid image file (PNG, JPG, etc.)'
-      setError(errorMsg)
-      toast.error(errorMsg)
+      toast.error('Invalid file type. Please upload an image.')
       return
     }
-
-    if (file.size > 10 * 1024 * 1024) {
-      const errorMsg = 'Image size must be less than 10MB'
-      setError(errorMsg)
-      toast.error(errorMsg)
-      return
-    }
-
     setImageFile(file)
-    setError(null)
-    toast.info('Image loaded successfully')
-
-    // Create preview
     const reader = new FileReader()
-    reader.onload = (e) => {
-      setImagePreview(e.target?.result as string)
-    }
+    reader.onload = (e) => setImagePreview(e.target?.result as string)
     reader.readAsDataURL(file)
-  }
-
-  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-    }))
-    if (errors[name]) {
-      setErrors((prev) => ({
-        ...prev,
-        [name]: '',
-      }))
-    }
-  }
-
-  const validateForm = (): boolean => {
-    const newErrors: Record<string, string> = {}
-
-    if (!formData.goal_id.trim()) {
-      newErrors.goal_id = 'Goal ID is required'
-    }
-
-    if (!formData.user_id.trim()) {
-      newErrors.user_id = 'User ID is required'
-    }
-
-    if (!imageFile) {
-      newErrors.image = 'Please select an image file'
-    }
-
-    setErrors(newErrors)
-    return Object.keys(newErrors).length === 0
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
-
-    if (!validateForm()) {
+    if (!formData.goal_id || !imageFile) {
+      toast.error('Goal ID and Proof Image are required.')
       return
     }
 
@@ -156,116 +99,106 @@ export function SubmitProofPage() {
       const verificationResult = await proofAPI.submit(
         formData.goal_id,
         formData.user_id,
-        imageFile!,
+        imageFile,
       )
       setResult(verificationResult)
-      
+
       if (verificationResult.verdict === 'APPROVED') {
-        toast.success(`Proof approved! ${(verificationResult.confidence * 100).toFixed(0)}% confidence.`)
-      } else if (verificationResult.verdict === 'REJECTED') {
-        toast.error('Proof rejected. Please try again with better evidence.')
-      } else if (verificationResult.verdict === 'FRAUD_DETECTED') {
-        toast.error('Fraud detected. Submission rejected.')
+        toast.success('Evidence verified by Agent Oracle.')
       } else {
-        toast.warning('Unclear evidence. Please resubmit with clearer proof.')
+        toast.error(`Verification rejected: ${verificationResult.verdict}`)
       }
     } catch (err) {
-      const errorMessage =
-        err instanceof Error
-          ? err.message
-          : 'Failed to submit proof. Please try again.'
-      setError(errorMessage)
-      toast.error(errorMessage)
+      toast.error('Submission failed. System instability detected.')
     } finally {
       setIsLoading(false)
     }
   }
 
-  const handleReset = () => {
-    setResult(null)
-    setImageFile(null)
-    setImagePreview(null)
-    setFormData({ goal_id: '', user_id: '' })
-  }
-
   if (result) {
     const isApproved = result.verdict === 'APPROVED'
-
     return (
       <Layout>
-        <div className="max-w-2xl mx-auto" ref={resultRef}>
-          <Card>
-            <CardBody className="text-center space-y-6">
-              <div className="flex justify-center">
-                <div className="relative">
-                  <div
-                    className={`absolute inset-0 animate-ping rounded-full opacity-20 ${
-                      isApproved ? 'bg-success' : 'bg-danger'
-                    }`}
-                  ></div>
-                  {isApproved ? (
-                    <IoCheckmarkCircle className="w-20 h-20 text-success relative" />
-                  ) : (
-                    <IoCloseCircle className="w-20 h-20 text-danger relative" />
+        <div className="max-w-3xl mx-auto py-12" ref={resultRef}>
+          <Card variant="elevated" shine className="overflow-hidden">
+            <div className={cn(
+              "py-12 text-center relative",
+              isApproved ? "bg-success-500/10" : "bg-error-500/10"
+            )}>
+              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 opacity-5 scale-150">
+                {isApproved ? <IoCheckmarkCircle className="text-9xl" /> : <IoCloseCircle className="text-9xl" />}
+              </div>
+
+              <div className="relative z-10 space-y-4">
+                <div className={cn(
+                  "w-20 h-20 rounded-full mx-auto flex items-center justify-center shadow-xl mb-6",
+                  isApproved ? "bg-success-500 text-white" : "bg-error-500 text-white"
+                )}>
+                  {isApproved ? <IoCheckmarkCircle className="w-12 h-12" /> : <IoCloseCircle className="w-12 h-12" />}
+                </div>
+
+                <h2 className="text-4xl font-heading font-black dark:text-white tracking-tight">
+                  {isApproved ? "Verification Approved" : "Verification Rejected"}
+                </h2>
+
+                <div className="flex justify-center gap-3">
+                  <Badge variant={isApproved ? "success" : "danger"} size="lg" dot pulse>
+                    Score: {(result.confidence * 100).toFixed(1)}%
+                  </Badge>
+                </div>
+              </div>
+            </div>
+
+            <CardBody className="py-12 space-y-8">
+              <Alert variant={isApproved ? "success" : "error"} title="Oracle Report" className="text-lg">
+                {result.message}
+              </Alert>
+
+              <div className="grid md:grid-cols-2 gap-8">
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Agent Reasoning</h4>
+                  <p className="text-sm text-gray-600 dark:text-gray-400 leading-relaxed italic border-l-2 border-gray-100 dark:border-gray-800 pl-4 py-2">
+                    "{result.reasoning}"
+                  </p>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-400">Submitted Evidence</h4>
+                  {imagePreview && (
+                    <div className="rounded-xl overflow-hidden border border-gray-100 dark:border-gray-800 aspect-video relative group cursor-zoom-in">
+                      <img src={imagePreview} className="w-full h-full object-cover transition-transform group-hover:scale-105" alt="Proof" />
+                      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-3xl">
+                        <IoSearch />
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
 
-              <div>
-                <h2 className="text-3xl font-bold mb-2 text-gray-900">
-                  {isApproved ? 'Proof Approved! 🎉' : 'Proof Rejected'}
-                </h2>
-                <Badge variant={isApproved ? 'success' : 'danger'}>
-                  Confidence: {(result.confidence * 100).toFixed(1)}%
-                </Badge>
-              </div>
-
-              <Alert type={isApproved ? 'success' : 'error'}>
-                <p className="text-lg font-semibold mb-2">{result.message}</p>
-                {result.recommendation && (
-                  <p className="text-sm mt-2">{result.recommendation}</p>
-                )}
-                {result.reasoning && (
-                  <p className="text-xs mt-2 opacity-75 italic">{result.reasoning}</p>
-                )}
-              </Alert>
-
               {result.fraud_signals.length > 0 && (
-                <div className="bg-yellow-50 p-4 rounded text-left">
-                  <p className="font-semibold text-yellow-900 mb-2">
-                    Detected Signals:
-                  </p>
-                  <ul className="space-y-1">
-                    {result.fraud_signals.map((signal, idx) => (
-                      <li key={idx} className="text-sm text-yellow-800">
-                        • {signal}
+                <div className="p-6 rounded-2xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center gap-2 mb-4 text-amber-700 dark:text-amber-500">
+                    <IoAlertCircle className="w-5 h-5" />
+                    <span className="font-bold uppercase tracking-widest text-xs">Anomaly Detected</span>
+                  </div>
+                  <ul className="space-y-2">
+                    {result.fraud_signals.map((s, i) => (
+                      <li key={i} className="text-sm text-amber-700 dark:text-amber-400 flex items-center gap-2">
+                        <div className="w-1 h-1 rounded-full bg-amber-500" /> {s}
                       </li>
                     ))}
                   </ul>
                 </div>
               )}
-
-              {imagePreview && (
-                <div className="space-y-2">
-                  <p className="text-sm text-gray-600">Submitted Image:</p>
-                  <img
-                    src={imagePreview}
-                    alt="Submitted proof"
-                    className="w-full rounded-lg max-h-80 object-cover"
-                  />
-                </div>
-              )}
             </CardBody>
 
-            <CardFooter className="flex gap-2">
-              <Button onClick={handleReset} variant="secondary" className="flex-1">
-                Submit Another
-              </Button>
-              <Link to="/dashboard" className="flex-1">
-                <Button className="w-full" variant="success">
-                  View Dashboard
-                </Button>
-              </Link>
+            <CardFooter className="bg-gray-50/50 dark:bg-gray-950/50 p-8 border-t border-gray-100 dark:border-gray-800">
+              <div className="flex flex-col sm:flex-row gap-4 w-full">
+                <Button variant="outline" fullWidth onClick={() => setResult(null)}>Upload New Proof</Button>
+                <Link to="/dashboard" className="flex-1">
+                  <Button variant="gradient" fullWidth icon={<IoArrowForward />}>View Success Chain</Button>
+                </Link>
+              </div>
             </CardFooter>
           </Card>
         </div>
@@ -275,142 +208,160 @@ export function SubmitProofPage() {
 
   return (
     <Layout>
-      <div className="max-w-2xl mx-auto" ref={formRef}>
-        <Card>
-          <CardHeader>
-            <h1 className="text-3xl font-bold text-gray-900">Submit Proof</h1>
-            <p className="text-gray-600 mt-2">
-              Upload an image as proof of completing your goal. Our AI will verify it.
-            </p>
-          </CardHeader>
+      <div className="max-w-4xl mx-auto">
+        <div className="mb-12 text-center step-child">
+          <Badge variant="secondary" className="mb-4">Oracle Verification</Badge>
+          <h1 className="text-4xl md:text-5xl font-heading font-black dark:text-white tracking-tight leading-tight">
+            Submit Commitment<br /><span className="gradient-text">Evidence</span>
+          </h1>
+          <p className="text-gray-500 dark:text-gray-400 mt-4 max-w-xl mx-auto font-medium">
+            Upload artifacts for AI evaluation. The Agent Oracle will perform a cross-network
+            analysis for authenticity and goal alignment.
+          </p>
+        </div>
 
-          <CardBody>
-            {error && (
-              <Alert type="error" title="Error" onClose={() => setError(null)}>
-                {error}
-              </Alert>
-            )}
+        <div ref={formRef} className="grid lg:grid-cols-5 gap-8">
 
-            <form onSubmit={handleSubmit} className="space-y-6">
-              {/* Image Upload */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Proof Image
-                </label>
-                <div
-                  ref={dragRef}
-                  onDragOver={handleDragOver}
-                  onDragLeave={handleDragLeave}
-                  onDrop={handleDrop}
-                  className={`border-2 border-dashed rounded-xl p-8 md:p-12 text-center transition-all cursor-pointer ${
-                    isDragging
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20 scale-105'
-                      : 'border-gray-300 dark:border-gray-600 hover:border-blue-400 dark:hover:border-blue-500'
-                  } ${errors.image ? 'border-red-500 dark:border-red-500' : ''}`}
-                >
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleFileSelect}
-                    className="hidden"
-                    id="image-input"
-                  />
-                  <label htmlFor="image-input" className="cursor-pointer">
-                    <IoCloudUpload
-                      className={`w-16 h-16 mx-auto mb-4 transition-colors ${
+          <div className="lg:col-span-3 space-y-8">
+            <Card variant="elevated" className="step-child overflow-hidden">
+              <CardBody className="p-0">
+                <form onSubmit={handleSubmit} className="p-8 space-y-8">
+
+                  {/* Goal ID Input */}
+                  <div className="space-y-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <IoScan className="text-indigo-600" />
+                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-500">Protocol Link</h4>
+                    </div>
+                    <Input
+                      placeholder="Protocol ID (e.g. goal_x82f...)"
+                      value={formData.goal_id}
+                      onChange={(e) => setFormData(p => ({ ...p, goal_id: e.target.value }))}
+                      className="bg-gray-50 dark:bg-gray-900 border-none !p-4 font-mono font-bold"
+                      leftIcon={<IoRocket />}
+                    />
+                  </div>
+
+                  {/* Upload Zone */}
+                  <div>
+                    <div className="flex items-center gap-2 mb-4">
+                      <IoImage className="text-indigo-600" />
+                      <h4 className="text-sm font-black uppercase tracking-widest text-gray-500">Evidence Artifact</h4>
+                    </div>
+
+                    <div
+                      onDragOver={handleDragOver}
+                      onDragLeave={handleDragLeave}
+                      onDrop={handleDrop}
+                      onClick={() => document.getElementById('proof-upload')?.click()}
+                      className={cn(
+                        "relative rounded-3xl border-4 border-dashed transition-all duration-300 group cursor-pointer aspect-video flex flex-col items-center justify-center p-8 text-center",
                         isDragging
-                          ? 'text-blue-500'
-                          : 'text-gray-400 dark:text-gray-500'
-                      }`}
-                    />
-                    <p className="font-semibold text-gray-900 dark:text-white text-lg">
-                      Drag and drop your image here
-                    </p>
-                    <p className="text-sm text-gray-500 dark:text-gray-400 mt-2">
-                      or click to select a file
-                    </p>
-                    <p className="text-xs text-gray-400 dark:text-gray-500 mt-2">
-                      Supports PNG, JPG, WEBP (max 10MB)
-                    </p>
-                  </label>
-                </div>
-                {errors.image && (
-                  <p className="mt-1 text-sm text-danger">{errors.image}</p>
-                )}
-              </div>
-
-              {/* Image Preview */}
-              {imagePreview && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-gray-700">Preview</p>
-                  <div className="relative">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="w-full rounded-lg max-h-80 object-cover"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setImageFile(null)
-                        setImagePreview(null)
-                      }}
-                      className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded hover:bg-red-600"
+                          ? "border-indigo-600 bg-indigo-50/50 dark:bg-indigo-950/20 scale-[0.98]"
+                          : "border-gray-200 dark:border-gray-800 hover:border-indigo-400 hover:bg-gray-50 dark:hover:bg-gray-900/50"
+                      )}
                     >
-                      ×
-                    </button>
+                      <input
+                        id="proof-upload"
+                        type="file"
+                        className="hidden"
+                        onChange={handleFileSelect}
+                        accept="image/*"
+                      />
+
+                      {imagePreview ? (
+                        <div className="absolute inset-0 p-4">
+                          <img src={imagePreview} className="w-full h-full object-cover rounded-2xl shadow-2xl" alt="Preview" />
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center text-white">
+                            <div className="flex flex-col items-center gap-2">
+                              <IoCloudUpload className="text-4xl" />
+                              <span className="font-bold">Replace Artfact</span>
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="space-y-4">
+                          <div className="w-20 h-20 rounded-2xl bg-gray-100 dark:bg-gray-800 flex items-center justify-center mx-auto transition-transform group-hover:scale-110 group-hover:rotate-3">
+                            <IoCloudUpload className="text-3xl text-gray-400 group-hover:text-indigo-600 transition-colors" />
+                          </div>
+                          <div>
+                            <p className="text-xl font-bold dark:text-white">Drag & drop evidence</p>
+                            <p className="text-gray-400 mt-1 max-w-xs">High-resolution artifacts (PNG, JPG) up to 10MB recommended for oracle stability.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="pt-4">
+                    <Button
+                      type="submit"
+                      variant="gradient"
+                      size="xl"
+                      fullWidth
+                      isLoading={isLoading}
+                      className="h-16 shadow-2xl shadow-indigo-500/20"
+                      icon={<IoFlash />}
+                    >
+                      {isLoading ? "Consulting Agent Oracle..." : "Submit for Verification"}
+                    </Button>
+                  </div>
+                </form>
+              </CardBody>
+            </Card>
+          </div>
+
+          <div className="lg:col-span-2 space-y-8">
+            <Card variant="glass" className="step-child">
+              <CardHeader>
+                <CardTitle>Verification Protocol</CardTitle>
+              </CardHeader>
+              <CardBody className="space-y-6">
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 flex flex-shrink-0 items-center justify-center">
+                    <IoShieldCheckmark />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-sm dark:text-white">Metadata Analysis</h5>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">Agent Oracle audits EXIF data and timestamps to ensure evidence is recently collected.</p>
                   </div>
                 </div>
-              )}
-
-              {/* Goal and User IDs */}
-              <div className="grid md:grid-cols-2 gap-6">
-                <Input
-                  label="Goal ID"
-                  name="goal_id"
-                  placeholder="e.g., goal_abc123..."
-                  value={formData.goal_id}
-                  onChange={handleInputChange}
-                  error={errors.goal_id}
-                  helperText="Copy from your goal creation"
-                />
-
-                <Input
-                  label="Your User ID"
-                  name="user_id"
-                  placeholder="e.g., user_xyz789..."
-                  value={formData.user_id}
-                  onChange={handleInputChange}
-                  error={errors.user_id}
-                  helperText="Your unique user identifier"
-                />
-              </div>
-
-              <Alert type="info">
-                <strong>How verification works:</strong> Our AI analyzes your image
-                against your goal description. It checks for authenticity, metadata,
-                and fraud signals. Results are instant.
-              </Alert>
-
-              <Button
-                type="submit"
-                variant="success"
-                size="lg"
-                isLoading={isLoading}
-                className="w-full"
-              >
-                {isLoading ? (
-                  <div className="flex items-center gap-2">
-                    <Loader size="sm" />
-                    Verifying...
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 flex flex-shrink-0 items-center justify-center">
+                    <IoSparkles />
                   </div>
-                ) : (
-                  'Submit for Verification'
-                )}
-              </Button>
-            </form>
-          </CardBody>
-        </Card>
+                  <div>
+                    <h5 className="font-bold text-sm dark:text-white">Semantic Logic</h5>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">Cross-referencing artifact content with your commitment definition for semantic alignment.</p>
+                  </div>
+                </div>
+                <div className="flex gap-4">
+                  <div className="w-10 h-10 rounded-xl bg-indigo-600/10 text-indigo-600 flex flex-shrink-0 items-center justify-center">
+                    <IoAlertCircle />
+                  </div>
+                  <div>
+                    <h5 className="font-bold text-sm dark:text-white">Fraud Countermeasures</h5>
+                    <p className="text-xs text-gray-400 mt-1 leading-relaxed">Deep analysis for digital manipulation, AI generation, or recycled artifacts.</p>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            <Card variant="elevated" shine className="bg-gray-900 border-none text-white step-child">
+              <CardBody className="text-center py-8">
+                <div className="text-4xl mb-4">🔮</div>
+                <h4 className="font-heading font-black text-xl mb-2">Oracle Prediction</h4>
+                <p className="text-gray-400 text-sm mb-6">Based on your recent 5 commitments, the Oracle expects 94% verification success.</p>
+                <div className="flex justify-center gap-1">
+                  {[1, 1, 1, 1, 0].map((s, i) => (
+                    <div key={i} className={cn("w-2 h-2 rounded-full", s ? "bg-success-500" : "bg-gray-700")} />
+                  ))}
+                </div>
+              </CardBody>
+            </Card>
+          </div>
+
+        </div>
       </div>
     </Layout>
   )

@@ -1,11 +1,15 @@
+/**
+ * Premium Skeleton Component
+ * High-performance, brand-aligned loading states
+ */
+
 import { cn } from '../utils/cn'
 
 interface SkeletonProps {
   className?: string
-  variant?: 'text' | 'circular' | 'rectangular'
+  variant?: 'text' | 'circular' | 'rectangular' | 'rounded'
   width?: string | number
   height?: string | number
-  animation?: 'pulse' | 'wave' | 'none'
 }
 
 export function Skeleton({
@@ -13,20 +17,12 @@ export function Skeleton({
   variant = 'rectangular',
   width,
   height,
-  animation = 'pulse',
 }: SkeletonProps) {
-  const baseClasses = 'bg-gray-200 dark:bg-gray-700 rounded'
-  
   const variantClasses = {
-    text: 'h-4 rounded',
+    text: 'h-4 w-full rounded',
     circular: 'rounded-full',
-    rectangular: 'rounded-lg',
-  }
-
-  const animationClasses = {
-    pulse: 'animate-pulse',
-    wave: 'animate-shimmer',
-    none: '',
+    rectangular: 'rounded-none',
+    rounded: 'rounded-xl',
   }
 
   const style: React.CSSProperties = {}
@@ -36,13 +32,16 @@ export function Skeleton({
   return (
     <div
       className={cn(
-        baseClasses,
+        'animate-shimmer overflow-hidden relative',
+        'bg-gray-200 dark:bg-gray-800',
         variantClasses[variant],
-        animationClasses[animation],
         className
       )}
       style={style}
-    />
+    >
+      {/* Shimmer overlay */}
+      <div className="absolute inset-0 -translate-x-full animate-[shimmer_2s_infinite] bg-gradient-to-r from-transparent via-white/20 dark:via-white/5 to-transparent" />
+    </div>
   )
 }
 
@@ -53,16 +52,37 @@ interface SkeletonTextProps {
 
 export function SkeletonText({ lines = 3, className }: SkeletonTextProps) {
   return (
-    <div className={cn('space-y-2', className)}>
+    <div className={cn('space-y-3', className)}>
       {Array.from({ length: lines }).map((_, i) => (
         <Skeleton
           key={i}
           variant="text"
-          width={i === lines - 1 ? '75%' : '100%'}
-          animation="pulse"
+          width={i === lines - 1 && lines > 1 ? '60%' : '100%'}
         />
       ))}
     </div>
   )
 }
 
+/**
+ * Goal Card Skeleton
+ */
+export function GoalCardSkeleton() {
+  return (
+    <div className="p-6 rounded-xl border-2 border-gray-100 dark:border-gray-800 bg-white dark:bg-gray-900 overflow-hidden">
+      <div className="flex justify-between mb-4">
+        <Skeleton variant="rounded" width={80} height={24} />
+        <Skeleton variant="rounded" width={100} height={24} />
+      </div>
+      <Skeleton variant="text" height={32} className="mb-4" />
+      <SkeletonText lines={2} className="mb-6" />
+      <div className="flex justify-between items-end border-t border-gray-100 dark:border-gray-800 pt-4">
+        <div>
+          <Skeleton variant="text" width={40} height={12} className="mb-2" />
+          <Skeleton variant="text" width={80} height={24} />
+        </div>
+        <Skeleton variant="rounded" width={120} height={40} />
+      </div>
+    </div>
+  )
+}
