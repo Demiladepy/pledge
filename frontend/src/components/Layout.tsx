@@ -17,7 +17,7 @@ import {
 } from 'react-icons/io5'
 import { useTheme } from '../contexts/ThemeContext'
 import { cn } from '../utils/cn'
-import { WalletButton } from './Web3Components'
+import WalletConnector from './WalletConnector'
 
 interface LayoutProps {
   children: ReactNode
@@ -102,11 +102,7 @@ export function Layout({ children }: LayoutProps) {
           {/* Right Actions */}
           <div className="flex items-center gap-3">
             <div className="hidden sm:block">
-              <WalletButton
-                isConnected={false}
-                onConnect={() => { }}
-                onDisconnect={() => { }}
-              />
+              <WalletConnector />
             </div>
 
             <button
@@ -163,12 +159,7 @@ export function Layout({ children }: LayoutProps) {
               </Link>
             ))}
             <div className="pt-4 sm:hidden">
-              <WalletButton
-                isConnected={false}
-                onConnect={() => { }}
-                onDisconnect={() => { }}
-                className="w-full justify-center py-4"
-              />
+              <WalletConnector className="w-full justify-center py-4" />
             </div>
           </div>
         </div>

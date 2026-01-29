@@ -254,9 +254,9 @@ export function CreateGoalPage() {
 
                     <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                       {[
-                        { id: 'motivational', label: 'Mentor', icon: '🧠' },
-                        { id: 'strict', label: 'Judge', icon: '🛡️' },
-                        { id: 'roast', label: 'Roaster', icon: '🔥' }
+                        { id: 'motivational', label: 'Mentor', icon: <IoSparkles /> },
+                        { id: 'strict', label: 'Judge', icon: <IoShieldCheckmark /> },
+                        { id: 'roast', label: 'Roaster', icon: <IoFlame /> }
                       ].map(mode => (
                         <button
                           key={mode.id}
