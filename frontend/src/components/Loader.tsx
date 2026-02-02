@@ -32,12 +32,17 @@ export function Loader({
   }
 
   return (
-    <div className={cn('relative', sizeClasses[size], className)}>
+    <div 
+      className={cn('relative', sizeClasses[size], className)}
+      role="status"
+      aria-label="Loading"
+    >
       <svg
         className={cn('animate-spin', variantClasses[variant])}
         xmlns="http://www.w3.org/2000/svg"
         fill="none"
         viewBox="0 0 24 24"
+        aria-hidden="true"
       >
         <circle
           className="opacity-10"
@@ -53,13 +58,17 @@ export function Loader({
           d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
         />
       </svg>
+      <span className="sr-only">Loading...</span>
 
       {/* Brand accent pulse */}
-      <div className={cn(
-        'absolute inset-0 rounded-full animate-ping opacity-20',
-        variant === 'primary' ? 'bg-indigo-500' :
-          variant === 'secondary' ? 'bg-cyan-500' : 'bg-white'
-      )} />
+      <div 
+        className={cn(
+          'absolute inset-0 rounded-full animate-ping opacity-20',
+          variant === 'primary' ? 'bg-indigo-500' :
+            variant === 'secondary' ? 'bg-cyan-500' : 'bg-white'
+        )} 
+        aria-hidden="true"
+      />
     </div>
   )
 }

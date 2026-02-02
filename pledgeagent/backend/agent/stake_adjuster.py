@@ -3,11 +3,14 @@ Stake Adjustment System
 Learns user behavior and adjusts stakes/messaging accordingly
 """
 
-from typing import Optional
+from typing import Optional, Dict, Any, TYPE_CHECKING
 from datetime import datetime, timedelta
 from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, Boolean
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
+if TYPE_CHECKING:
+    from ..observability.opik_logger import OpikLogger
 
 Base = declarative_base()
 
@@ -39,10 +42,11 @@ class StakeAdjuster:
     - When to send ultimatums
     """
     
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, opik_logger: Optional["OpikLogger"] = None):
         self.engine = create_engine(database_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
+        self.opik = opik_logger
     
     async def record_success(self, user_id: str, goal_id: str):
         """Record successful proof submission"""
@@ -50,6 +54,7 @@ class StakeAdjuster:
         
         try:
             profile = self._get_or_create_profile(session, user_id)
+            old_stake = profile.current_stake
             
             # Update metrics
             profile.current_streak += 1
@@ -59,13 +64,21 @@ class StakeAdjuster:
             profile.compassion_mode = False
             
             # Adaptive stake increase on streaks
+            stake_changed = False
             if profile.current_streak >= 3:
-                old_stake = profile.current_stake
                 profile.current_stake = min(old_stake * 1.2, 500.0)  # Cap at $500
-                
-                # TODO: Send notification about stake increase
+                stake_changed = True
                 
             session.commit()
+            
+            # Log stake adjustment to Opik if stake changed
+            if stake_changed and self.opik:
+                await self.opik.log_stake_adjustment(
+                    user_id=user_id,
+                    old_stake=old_stake,
+                    new_stake=profile.current_stake,
+                    reason=f"streak_bonus_{profile.current_streak}"
+                )
             
         finally:
             session.close()
@@ -76,6 +89,7 @@ class StakeAdjuster:
         
         try:
             profile = self._get_or_create_profile(session, user_id)
+            old_stake = profile.current_stake
             
             # Update metrics
             profile.current_streak = 0
@@ -84,14 +98,22 @@ class StakeAdjuster:
             profile.last_failure_date = datetime.utcnow()
             
             # Compassion override after multiple failures
+            stake_changed = False
             if profile.recent_failures >= 2:
                 profile.compassion_mode = True
-                old_stake = profile.current_stake
                 profile.current_stake = max(old_stake * 0.8, 10.0)  # Floor at $10
-                
-                # TODO: Send compassionate message
+                stake_changed = True
             
             session.commit()
+            
+            # Log stake adjustment to Opik if stake changed
+            if stake_changed and self.opik:
+                await self.opik.log_stake_adjustment(
+                    user_id=user_id,
+                    old_stake=old_stake,
+                    new_stake=profile.current_stake,
+                    reason="compassion_reduction"
+                )
             
         finally:
             session.close()
@@ -189,3 +211,27 @@ class StakeAdjuster:
             session.commit()
         
         return profile
+    
+    def get_user_stats(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get user statistics for dashboard display.
+        Returns a dictionary with user metrics.
+        """
+        session = self.Session()
+        
+        try:
+            profile = self._get_or_create_profile(session, user_id)
+            
+            return {
+                "user_id": user_id,
+                "current_streak": profile.current_streak,
+                "total_successes": profile.total_successes,
+                "total_failures": profile.total_failures,
+                "current_stake": profile.current_stake,
+                "compassion_mode": profile.compassion_mode,
+                "recent_failures": profile.recent_failures,
+                "last_success_date": profile.last_success_date.isoformat() if profile.last_success_date else None,
+                "last_failure_date": profile.last_failure_date.isoformat() if profile.last_failure_date else None,
+            }
+        finally:
+            session.close()

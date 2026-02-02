@@ -4,7 +4,7 @@ Learns from past cheating attempts to catch future fraud
 """
 
 import hashlib
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 from datetime import datetime, timedelta
 import imagehash
 from PIL import Image
@@ -13,6 +13,9 @@ import io
 from sqlalchemy import create_engine, Column, String, Float, Integer, DateTime, JSON
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+
+if TYPE_CHECKING:
+    from ..observability.opik_logger import OpikLogger
 
 Base = declarative_base()
 
@@ -60,10 +63,11 @@ class FraudPatternMatcher:
     Every pattern learned makes detection faster.
     """
     
-    def __init__(self, database_url: str):
+    def __init__(self, database_url: str, opik_logger: Optional["OpikLogger"] = None):
         self.engine = create_engine(database_url)
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
+        self.opik = opik_logger
         
     async def analyze(
         self,
@@ -129,6 +133,16 @@ class FraudPatternMatcher:
             signals=signals,
             score=fraud_score
         )
+        
+        # Log to Opik for observability
+        if self.opik:
+            await self.opik.log_fraud_detection(
+                user_id=user_id,
+                goal_id=goal_id,
+                signals=signals,
+                score=fraud_score,
+                details=details
+            )
         
         return {
             "score": fraud_score,

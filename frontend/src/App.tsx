@@ -7,6 +7,8 @@ import {
 } from './pages'
 import { ToastContainer } from './components/Toast'
 import { ToastProvider, useToast } from './contexts/ToastContext'
+import { ThemeProvider } from './contexts/ThemeContext'
+import { ErrorBoundary } from './components/ErrorBoundary'
 
 function AppContent() {
   const { toasts, removeToast } = useToast()
@@ -25,17 +27,17 @@ function AppContent() {
   )
 }
 
-import { ThemeProvider } from './contexts/ThemeContext'
-
 function App() {
   return (
-    <Router>
-      <ThemeProvider>
-        <ToastProvider>
-          <AppContent />
-        </ToastProvider>
-      </ThemeProvider>
-    </Router>
+    <ErrorBoundary>
+      <Router>
+        <ThemeProvider>
+          <ToastProvider>
+            <AppContent />
+          </ToastProvider>
+        </ThemeProvider>
+      </Router>
+    </ErrorBoundary>
   )
 }
 

@@ -1,4 +1,4 @@
-import axios, { AxiosInstance } from 'axios'
+import axios, { AxiosInstance, AxiosError } from 'axios'
 
 const API_URL = (import.meta.env.VITE_API_URL as string) || 'http://localhost:8000'
 
@@ -7,6 +7,7 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 })
 
 // Types for API requests and responses
@@ -51,6 +52,31 @@ export interface UserStats {
   total_stake_locked: number
   current_streak: number
   personality_mode: string
+  // Extended profile data
+  protocol_rank: string
+  last_proof_date: string | null
+  total_rewards: number
+}
+
+export interface ActivityItem {
+  id: string
+  event_type: 'verification_success' | 'verification_failed' | 'goal_created' | 'stake_locked'
+  description: string
+  timestamp: string
+  goal_id?: string
+  user_id: string
+}
+
+export interface SystemStatus {
+  api_status: string
+  database_connected: boolean
+  blockchain_connected: boolean
+  blockchain_network?: string
+  agent_address?: string
+  opik_enabled: boolean
+  opik_dashboard_url?: string
+  contract_address?: string
+  gemini_enabled: boolean
 }
 
 export interface MetricsDashboard {
@@ -96,17 +122,42 @@ export const proofAPI = {
 
 export const userAPI = {
   getStats: async (userId: string): Promise<UserStats> => {
+    // Always fetch real data - no mock fallback for production readiness
     const response = await apiClient.get<UserStats>(`/api/user/${userId}/stats`)
+    return response.data
+  },
+  
+  getActivity: async (userId: string, limit: number = 10): Promise<ActivityItem[]> => {
+    const response = await apiClient.get<ActivityItem[]>(`/api/user/${userId}/activity`, {
+      params: { limit }
+    })
     return response.data
   },
 }
 
 export const metricsAPI = {
   getDashboard: async (): Promise<MetricsDashboard> => {
-    const response = await apiClient.get<MetricsDashboard>(
-      '/api/metrics/dashboard',
-    )
+    const response = await apiClient.get<MetricsDashboard>('/api/metrics/dashboard')
     return response.data
+  },
+}
+
+export const systemAPI = {
+  getStatus: async (): Promise<SystemStatus> => {
+    const response = await apiClient.get<SystemStatus>('/api/system/status')
+    return response.data
+  },
+}
+
+// Health check to verify backend connection
+export const healthAPI = {
+  check: async (): Promise<boolean> => {
+    try {
+      await apiClient.get('/')
+      return true
+    } catch {
+      return false
+    }
   },
 }
 

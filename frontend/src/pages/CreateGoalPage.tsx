@@ -47,12 +47,20 @@ export function CreateGoalPage() {
 
   useEffect(() => {
     if (formRef.current && !success) {
+      // Mark body as GSAP ready for CSS fallback system
+      document.body.classList.add('gsap-ready')
+      
+      // Set initial state explicitly
+      gsap.set('.form-step', { opacity: 1, y: 0 })
+      
+      // Then animate from hidden state
       gsap.from('.form-step', {
         duration: 0.8,
         opacity: 0,
         y: 30,
         stagger: 0.1,
         ease: 'power4.out',
+        clearProps: 'all', // Clear inline styles after animation completes
       })
     }
   }, [success])

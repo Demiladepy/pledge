@@ -3,7 +3,7 @@
  * Enhanced with brand identity, better navigation, and smooth transitions
  */
 
-import { ReactNode, useState, useEffect } from 'react'
+import { ReactNode, useState, useEffect, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   IoMoon,
@@ -29,35 +29,68 @@ export function Layout({ children }: LayoutProps) {
   const [scrolled, setScrolled] = useState(false)
   const location = useLocation()
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false)
+  }, [location.pathname])
+
+  // Handle scroll for header styling
   useEffect(() => {
     const handleScroll = () => {
       setScrolled(window.scrollY > 20)
     }
-    window.addEventListener('scroll', handleScroll)
+    window.addEventListener('scroll', handleScroll, { passive: true })
     return () => window.removeEventListener('scroll', handleScroll)
   }, [])
 
-  const toggleTheme = () => {
+  // Handle escape key to close mobile menu
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && mobileMenuOpen) {
+        setMobileMenuOpen(false)
+      }
+    }
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [mobileMenuOpen])
+
+  // Prevent body scroll when mobile menu is open
+  useEffect(() => {
+    if (mobileMenuOpen) {
+      document.body.style.overflow = 'hidden'
+    } else {
+      document.body.style.overflow = ''
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [mobileMenuOpen])
+
+  const toggleTheme = useCallback(() => {
     setTheme(resolvedTheme === 'dark' ? 'light' : 'dark')
-  }
+  }, [resolvedTheme, setTheme])
 
   const navLinks = [
-    { to: '/dashboard', label: 'Dashboard', icon: <IoStatsChart /> },
-    { to: '/create-goal', label: 'Create Goal', icon: <IoAddCircle /> },
-    { to: '/submit-proof', label: 'Submit Proof', icon: <IoCloudUpload /> },
+    { to: '/dashboard', label: 'Dashboard', icon: <IoStatsChart aria-hidden="true" /> },
+    { to: '/create-goal', label: 'Create Goal', icon: <IoAddCircle aria-hidden="true" /> },
+    { to: '/submit-proof', label: 'Submit Proof', icon: <IoCloudUpload aria-hidden="true" /> },
   ]
 
   const isActive = (path: string) => location.pathname === path
 
   return (
     <div className="min-h-screen bg-white dark:bg-gray-950 transition-colors duration-500">
-      {/* Skip to Content */}
-      <a href="#main-content" className="skip-to-content">
-        Skip to content
+      {/* Skip to Content - Accessible skip link */}
+      <a 
+        href="#main-content" 
+        className="skip-to-content"
+      >
+        Skip to main content
       </a>
 
       {/* Header */}
       <header
+        role="banner"
         className={cn(
           'sticky top-0 z-[1000] w-full transition-all duration-300',
           scrolled
@@ -65,9 +98,17 @@ export function Layout({ children }: LayoutProps) {
             : 'bg-transparent py-5'
         )}
       >
-        <nav className="container-custom flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-3 group">
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+        <nav 
+          className="container-custom flex items-center justify-between"
+          role="navigation"
+          aria-label="Main navigation"
+        >
+          <Link 
+            to="/" 
+            className="flex items-center gap-3 group"
+            aria-label="PledgeAgent - Go to homepage"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-600 to-cyan-500 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform" aria-hidden="true">
               <IoRocket className="w-6 h-6" />
             </div>
             <div className="flex flex-col">
@@ -81,11 +122,13 @@ export function Layout({ children }: LayoutProps) {
           </Link>
 
           {/* Desktop Nav */}
-          <div className="hidden lg:flex items-center gap-2">
+          <div className="hidden lg:flex items-center gap-2" role="menubar">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
+                role="menuitem"
+                aria-current={isActive(link.to) ? 'page' : undefined}
                 className={cn(
                   'px-4 py-2 rounded-lg text-sm font-semibold transition-all flex items-center gap-2',
                   isActive(link.to)
@@ -107,40 +150,51 @@ export function Layout({ children }: LayoutProps) {
 
             <button
               onClick={toggleTheme}
-              className="p-2.5 rounded-xl glass hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-              aria-label="Toggle theme"
+              className="p-2.5 rounded-xl glass hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              aria-label={resolvedTheme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
             >
               {resolvedTheme === 'dark' ? (
-                <IoSunny className="w-5 h-5 text-yellow-500" />
+                <IoSunny className="w-5 h-5 text-yellow-500" aria-hidden="true" />
               ) : (
-                <IoMoon className="w-5 h-5" />
+                <IoMoon className="w-5 h-5" aria-hidden="true" />
               )}
             </button>
 
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="lg:hidden p-2.5 rounded-xl glass hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700"
-              aria-label="Toggle menu"
+              className="lg:hidden p-2.5 rounded-xl glass hover:bg-white/80 dark:hover:bg-gray-800/80 transition-all text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:ring-offset-2"
+              aria-label={mobileMenuOpen ? 'Close navigation menu' : 'Open navigation menu'}
+              aria-expanded={mobileMenuOpen}
+              aria-controls="mobile-navigation"
             >
               {mobileMenuOpen ? (
-                <IoClose className="w-6 h-6" />
+                <IoClose className="w-6 h-6" aria-hidden="true" />
               ) : (
-                <IoMenu className="w-6 h-6" />
+                <IoMenu className="w-6 h-6" aria-hidden="true" />
               )}
             </button>
           </div>
         </nav>
 
         {/* Mobile Nav */}
-        <div className={cn(
-          'lg:hidden fixed inset-x-0 top-[70px] glass-strong border-b border-gray-200 dark:border-gray-800 transition-all duration-300 overflow-hidden',
-          mobileMenuOpen ? 'max-h-[400px] opacity-100 py-6' : 'max-h-0 opacity-0 py-0'
-        )}>
-          <div className="container-custom space-y-3">
+        <div 
+          id="mobile-navigation"
+          role="navigation"
+          aria-label="Mobile navigation"
+          aria-hidden={!mobileMenuOpen}
+          className={cn(
+            'lg:hidden fixed inset-x-0 top-[70px] glass-strong border-b border-gray-200 dark:border-gray-800 transition-all duration-300 overflow-hidden',
+            mobileMenuOpen ? 'max-h-[400px] opacity-100 py-6' : 'max-h-0 opacity-0 py-0'
+          )}
+        >
+          <div className="container-custom space-y-3" role="menu">
             {navLinks.map((link) => (
               <Link
                 key={link.to}
                 to={link.to}
+                role="menuitem"
+                aria-current={isActive(link.to) ? 'page' : undefined}
+                tabIndex={mobileMenuOpen ? 0 : -1}
                 className={cn(
                   'flex items-center gap-4 px-4 py-4 rounded-xl text-lg font-bold transition-all',
                   isActive(link.to)
@@ -149,10 +203,13 @@ export function Layout({ children }: LayoutProps) {
                 )}
                 onClick={() => setMobileMenuOpen(false)}
               >
-                <div className={cn(
-                  'w-10 h-10 rounded-lg flex items-center justify-center',
-                  isActive(link.to) ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800'
-                )}>
+                <div 
+                  className={cn(
+                    'w-10 h-10 rounded-lg flex items-center justify-center',
+                    isActive(link.to) ? 'bg-white/20' : 'bg-gray-100 dark:bg-gray-800'
+                  )}
+                  aria-hidden="true"
+                >
                   {link.icon}
                 </div>
                 {link.label}

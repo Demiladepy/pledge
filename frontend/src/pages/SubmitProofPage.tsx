@@ -48,12 +48,20 @@ export function SubmitProofPage() {
 
   useEffect(() => {
     if (formRef.current && !result) {
+      // Mark body as GSAP ready for CSS fallback system
+      document.body.classList.add('gsap-ready')
+      
+      // Set initial state explicitly to ensure visibility
+      gsap.set('.step-child', { opacity: 1, y: 0 })
+      
+      // Then animate from hidden state
       gsap.from('.step-child', {
         duration: 0.8,
         opacity: 0,
         y: 20,
         stagger: 0.1,
         ease: 'power4.out',
+        clearProps: 'all', // Clear inline styles after animation completes
       })
     }
   }, [result])
@@ -275,7 +283,7 @@ export function SubmitProofPage() {
                           <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity rounded-2xl flex items-center justify-center text-white">
                             <div className="flex flex-col items-center gap-2">
                               <IoCloudUpload className="text-4xl" />
-                              <span className="font-bold">Replace Artfact</span>
+                              <span className="font-bold">Replace Artifact</span>
                             </div>
                           </div>
                         </div>

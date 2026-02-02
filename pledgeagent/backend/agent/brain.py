@@ -38,15 +38,20 @@ class PledgeAgentBrain:
     
     def __init__(
         self,
-        openai_api_key: str,
+        google_api_key: str,
         opik_api_key: str,
         database_url: str
     ):
-        self.verifier = VerificationAgent(openai_api_key)
-        self.fraud_detector = FraudPatternMatcher(database_url)
-        self.stake_adjuster = StakeAdjuster(database_url)
+        # Initialize Opik logger first so we can pass it to other components
         self.opik = OpikLogger(opik_api_key)
+        
+        # Initialize components with Opik logger for full observability
+        self.verifier = VerificationAgent(google_api_key, opik_logger=self.opik)  # Gemini + Opik
+        self.fraud_detector = FraudPatternMatcher(database_url, opik_logger=self.opik)
+        self.stake_adjuster = StakeAdjuster(database_url, opik_logger=self.opik)
         self.contract = get_contract_interface()  # Blockchain integration
+        
+        print("🧠 PledgeAgent Brain initialized with full Opik observability")
         
     async def process_submission(
         self,

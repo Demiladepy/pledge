@@ -6,6 +6,7 @@
 import { useState, useEffect } from 'react'
 import {
   IoCheckmarkCircle,
+  IoCloseCircle,
   IoTrendingUp,
   IoRefresh,
   IoFlame,
@@ -13,7 +14,9 @@ import {
   IoRocket,
   IoFlash,
   IoSearch,
-  IoShieldCheckmark
+  IoShieldCheckmark,
+  IoCloudOffline,
+  IoCheckmarkDone
 } from 'react-icons/io5'
 import { Button, IconButton } from '../components/Button'
 import { Card, CardHeader, CardBody, CardTitle, CardDescription } from '../components/Card'
@@ -21,7 +24,7 @@ import { Input } from '../components/Input'
 import { Badge } from '../components/Badge'
 import { Layout } from '../components/Layout'
 import { Alert } from '../components/Alert'
-import { userAPI, UserStats } from '../utils/api'
+import { userAPI, systemAPI, UserStats, ActivityItem, SystemStatus } from '../utils/api'
 import { Link } from 'react-router-dom'
 import { AddressDisplay } from '../components/Web3Components'
 import { cn } from '../utils/cn'
@@ -32,31 +35,82 @@ export function DashboardPage() {
   )
   const [inputUserId, setInputUserId] = useState(userId)
   const [stats, setStats] = useState<UserStats | null>(null)
+  const [activity, setActivity] = useState<ActivityItem[]>([])
+  const [systemStatus, setSystemStatus] = useState<SystemStatus | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     localStorage.setItem('userId', userId)
-    fetchStats(userId)
+    fetchAllData(userId)
   }, [userId])
 
-  const fetchStats = async (id: string) => {
+  // Auto-refresh every 30 seconds for real-time feel
+  useEffect(() => {
+    const interval = setInterval(() => {
+      fetchAllData(userId)
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [userId])
+
+  const fetchAllData = async (id: string) => {
     setIsLoading(true)
     setError(null)
+    
     try {
-      const data = await userAPI.getStats(id)
-      setStats(data)
+      // Fetch all data in parallel
+      const [statsData, activityData, statusData] = await Promise.all([
+        userAPI.getStats(id).catch(() => null),
+        userAPI.getActivity(id, 5).catch(() => []),
+        systemAPI.getStatus().catch(() => null)
+      ])
+      
+      if (statsData) setStats(statsData)
+      setActivity(activityData)
+      if (statusData) setSystemStatus(statusData)
+      
+      if (!statsData) {
+        setError('Unable to fetch user stats. Please check backend connection.')
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load user stats.')
+      if (err instanceof Error) {
+        if (err.message.includes('Network Error') || err.message.includes('ECONNREFUSED')) {
+          setError('Backend server is offline. Start the server with: cd pledgeagent/backend && python -m uvicorn api.main:app --reload')
+        } else {
+          setError(err.message)
+        }
+      } else {
+        setError('Failed to load dashboard data. Please try again.')
+      }
     } finally {
       setIsLoading(false)
     }
+  }
+
+  // Format relative time
+  const formatRelativeTime = (dateStr: string | null) => {
+    if (!dateStr) return 'Never'
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 1) return 'Just now'
+    if (diffMins < 60) return `${diffMins} min ago`
+    if (diffHours < 24) return `${diffHours} hours ago`
+    return `${diffDays} days ago`
   }
 
   const handleUpdateUser = () => {
     if (inputUserId.trim()) {
       setUserId(inputUserId)
     }
+  }
+
+  const handleRefresh = () => {
+    fetchAllData(userId)
   }
 
   const statCards = [
@@ -111,15 +165,49 @@ export function DashboardPage() {
               />
             </div>
             <IconButton
-              icon={<IoRefresh />}
+              icon={<IoRefresh className={isLoading ? 'animate-spin' : ''} />}
               variant="glass"
-              onClick={handleUpdateUser}
+              onClick={handleRefresh}
               aria-label="Refresh stats"
             />
           </div>
         </div>
 
         {error && <Alert variant="error" title="Sync Error" className="mb-8">{error}</Alert>}
+
+        {/* System Status Indicator */}
+        {systemStatus && (
+          <div className="flex flex-wrap gap-3 mb-4">
+            <Badge variant={systemStatus.database_connected ? 'success' : 'danger'} size="sm">
+              {systemStatus.database_connected ? <IoCheckmarkDone className="mr-1" /> : <IoCloudOffline className="mr-1" />}
+              DB: {systemStatus.database_connected ? 'Connected' : 'Offline'}
+            </Badge>
+            <Badge variant={systemStatus.blockchain_connected ? 'success' : 'warning'} size="sm">
+              {systemStatus.blockchain_connected ? <IoCheckmarkDone className="mr-1" /> : <IoCloudOffline className="mr-1" />}
+              Blockchain: {systemStatus.blockchain_connected ? 'Connected' : 'Offline'}
+            </Badge>
+            <Badge variant={systemStatus.gemini_enabled ? 'success' : 'warning'} size="sm">
+              Gemini AI: {systemStatus.gemini_enabled ? 'Active' : 'Offline'}
+            </Badge>
+            {systemStatus.opik_enabled ? (
+              <a 
+                href={systemStatus.opik_dashboard_url || 'https://www.comet.com/opik'} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex"
+              >
+                <Badge variant="success" size="sm" className="cursor-pointer hover:opacity-80">
+                  <IoCheckmarkDone className="mr-1" />
+                  Opik Dashboard →
+                </Badge>
+              </a>
+            ) : (
+              <Badge variant="secondary" size="sm">
+                Opik: Disabled
+              </Badge>
+            )}
+          </div>
+        )}
 
         {/* Top Stats Cards */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-6">
@@ -273,35 +361,51 @@ export function DashboardPage() {
                 <div className="space-y-4">
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500 dark:text-gray-400 font-medium">Protocol Rank</span>
-                    <Badge variant="primary">Architect</Badge>
+                    <Badge variant="primary">{stats?.protocol_rank || 'Newcomer'}</Badge>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500 dark:text-gray-400 font-medium">Last Proof</span>
-                    <span className="font-bold dark:text-white">2 days ago</span>
+                    <span className="font-bold dark:text-white">{formatRelativeTime(stats?.last_proof_date || null)}</span>
                   </div>
                   <div className="flex justify-between items-center text-sm">
                     <span className="text-gray-500 dark:text-gray-400 font-medium">Total Rewards</span>
-                    <span className="font-bold text-success-500">+120 PA</span>
+                    <span className="font-bold text-success-500">+{stats?.total_rewards || 0} PA</span>
                   </div>
                 </div>
               </CardBody>
             </Card>
 
-            {/* Live Feed Mock */}
+            {/* Live Activity Feed - Real Data */}
             <div className="space-y-4">
               <h4 className="text-[10px] font-black uppercase tracking-widest text-gray-500 px-2">Protocol Activity</h4>
               <div className="space-y-3">
-                {[1, 2, 3].map((_, i) => (
-                  <div key={i} className="flex gap-4 p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 items-center opacity-60 grayscale hover:grayscale-0 hover:opacity-100 transition-all cursor-crosshair">
-                    <div className="w-10 h-10 rounded-full bg-gray-100 dark:bg-gray-800 flex flex-shrink-0 items-center justify-center">
-                      <IoCheckmarkCircle className="text-success-500" />
+                {activity.length > 0 ? (
+                  activity.map((item) => (
+                    <div key={item.id} className="flex gap-4 p-4 rounded-2xl bg-gray-50/50 dark:bg-gray-900/50 border border-gray-100 dark:border-gray-800 items-center hover:opacity-100 transition-all">
+                      <div className={cn(
+                        "w-10 h-10 rounded-full flex flex-shrink-0 items-center justify-center",
+                        item.event_type === 'verification_success' ? "bg-success-100 dark:bg-success-900/30" : "bg-error-100 dark:bg-error-900/30"
+                      )}>
+                        {item.event_type === 'verification_success' ? (
+                          <IoCheckmarkCircle className="text-success-500" />
+                        ) : (
+                          <IoCloseCircle className="text-error-500" />
+                        )}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-xs font-bold dark:text-white truncate">{item.description}</p>
+                        <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">
+                          {formatRelativeTime(item.timestamp)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="min-w-0">
-                      <p className="text-xs font-bold dark:text-white truncate">Proof Verified for Node_{Math.floor(Math.random() * 9999)}</p>
-                      <p className="text-[10px] text-gray-400 mt-1 uppercase tracking-widest font-bold">12 minutes ago</p>
-                    </div>
+                  ))
+                ) : (
+                  <div className="p-6 text-center text-gray-400 text-sm">
+                    <p>No activity yet.</p>
+                    <p className="text-xs mt-1">Submit your first proof to see activity here.</p>
                   </div>
-                ))}
+                )}
               </div>
             </div>
 

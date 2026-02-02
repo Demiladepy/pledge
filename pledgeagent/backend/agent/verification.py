@@ -1,29 +1,91 @@
 """
 Vision AI Verification Module
-Uses GPT-4o Vision to analyze proof submissions
+Uses Google Gemini Vision with Opik tracing for full observability
+
+Opik Integration: https://www.comet.com/docs/opik/integrations/gemini.mdx
 """
 
 import base64
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, TYPE_CHECKING
 import json
-from openai import AsyncOpenAI
+import time
+from PIL import Image
+import io
+
+try:
+    import google.generativeai as genai
+    GEMINI_AVAILABLE = True
+except ImportError:
+    GEMINI_AVAILABLE = False
+    print("⚠️  google-generativeai not installed")
+
+try:
+    import opik
+    from opik import track
+    from opik.integrations.gemini import track_gemini
+    OPIK_AVAILABLE = True
+except ImportError:
+    OPIK_AVAILABLE = False
+    track_gemini = None
+
+if TYPE_CHECKING:
+    from ..observability.opik_logger import OpikLogger
 
 
 class VerificationAgent:
     """
-    Analyzes images using GPT-4o Vision to determine if they prove goal completion.
+    Analyzes images using Gemini Vision to determine if they prove goal completion.
+    
+    Features:
+    - Gemini 1.5 Flash for fast image analysis
+    - Full Opik tracing for LLM observability
+    - Structured JSON responses
+    - Fraud signal detection
     """
     
-    def __init__(self, api_key: str):
-        self.client = AsyncOpenAI(api_key=api_key)
+    def __init__(self, api_key: str, opik_logger: Optional["OpikLogger"] = None):
+        """
+        Initialize with Google API key and optional Opik logger.
         
+        Args:
+            api_key: Google API key for Gemini
+            opik_logger: Optional OpikLogger instance for tracing
+        """
+        self.opik_logger = opik_logger
+        self.enabled = GEMINI_AVAILABLE and api_key and api_key != ""
+        
+        if self.enabled:
+            genai.configure(api_key=api_key)
+            
+            # Create the base model
+            base_model = genai.GenerativeModel('gemini-1.5-flash')
+            
+            # Wrap with Opik tracking if available
+            if OPIK_AVAILABLE and track_gemini:
+                try:
+                    self.model = track_gemini(base_model, project_name="pledgeagent")
+                    print("✅ Gemini Vision initialized with Opik tracing")
+                except Exception as e:
+                    print(f"⚠️  Opik Gemini tracking failed: {e}")
+                    self.model = base_model
+            else:
+                self.model = base_model
+                print("✅ Gemini Vision initialized (no Opik tracing)")
+        else:
+            self.model = None
+            if not GEMINI_AVAILABLE:
+                print("⚠️  Install: pip install google-generativeai")
+            elif not api_key:
+                print("⚠️  GOOGLE_API_KEY not set")
+    
+    @track(name="verify_proof", project_name="pledgeagent") if OPIK_AVAILABLE else lambda f: f
     async def verify_proof(
         self,
         image_data: bytes,
         goal_context: Dict[str, str]
     ) -> Dict[str, Any]:
         """
-        Main verification method.
+        Main verification method with full Opik tracing.
         
         Args:
             image_data: Raw image bytes
@@ -38,141 +100,161 @@ class VerificationAgent:
             }
         """
         
-        # Encode image to base64
-        image_b64 = base64.b64encode(image_data).decode('utf-8')
+        if not self.enabled:
+            return {
+                "verdict": "unclear",
+                "confidence": 0,
+                "reasoning": "Vision verification not configured. Set GOOGLE_API_KEY.",
+                "red_flags": ["api_not_configured"]
+            }
         
-        # Build verification prompt
-        prompt = self._build_verification_prompt(goal_context)
+        start_time = time.time()
         
         try:
-            response = await self.client.chat.completions.create(
-                model="gpt-4o",
-                messages=[
-                    {
-                        "role": "system",
-                        "content": "You are a strict judge verifying proof of completed goals. Be thorough and skeptical."
-                    },
-                    {
-                        "role": "user",
-                        "content": [
-                            {
-                                "type": "text",
-                                "text": prompt
-                            },
-                            {
-                                "type": "image_url",
-                                "image_url": {
-                                    "url": f"data:image/jpeg;base64,{image_b64}"
-                                }
-                            }
-                        ]
-                    }
-                ],
-                max_tokens=500,
-                temperature=0.3  # Lower temp = more consistent judgments
-            )
+            # Convert bytes to PIL Image
+            image = Image.open(io.BytesIO(image_data))
+            
+            # Build verification prompt
+            prompt = self._build_verification_prompt(goal_context)
+            
+            # Call Gemini Vision (automatically traced by Opik if enabled)
+            response = self.model.generate_content([prompt, image])
+            
+            latency_ms = (time.time() - start_time) * 1000
             
             # Parse response
-            result_text = response.choices[0].message.content
+            result_text = response.text
             result = self._parse_response(result_text)
+            
+            # Log to Opik if available
+            if self.opik_logger:
+                await self.opik_logger.log_gemini_call(
+                    prompt=prompt[:500],
+                    response=result_text[:500],
+                    model="gemini-1.5-flash",
+                    latency_ms=latency_ms
+                )
+            
+            print(f"🔍 Gemini verification: {result.get('verdict')} ({result.get('confidence')}% confidence) in {latency_ms:.0f}ms")
             
             return result
             
         except Exception as e:
-            # Fallback on API errors
+            error_msg = str(e)
+            print(f"❌ Gemini error: {error_msg}")
+            
+            # Return error result
             return {
                 "verdict": "unclear",
                 "confidence": 0,
-                "reasoning": f"Verification failed: {str(e)}",
+                "reasoning": f"Verification failed: {error_msg}",
                 "red_flags": ["api_error"]
             }
     
     def _build_verification_prompt(self, goal_context: Dict[str, str]) -> str:
         """
-        Construct the verification prompt for GPT-4o.
+        Construct the verification prompt for Gemini.
         """
         
         goal_desc = goal_context.get("description", "")
         proof_type = goal_context.get("expected_proof", "photo")
         
-        prompt = f"""You are verifying proof of goal completion.
+        prompt = f"""You are a strict AI judge verifying proof of goal completion for an accountability app.
 
 **Goal:** {goal_desc}
 **Expected Proof Type:** {proof_type}
-**Your Task:** Determine if this image proves the goal was completed TODAY.
+
+**Your Task:** Analyze this image and determine if it proves the goal was completed TODAY.
 
 **Analysis Checklist:**
 1. Does the image clearly show evidence of the stated goal?
-2. Are there any signs this is an old photo (clothing, environment, visible dates)?
-3. Are there signs of digital manipulation (artifacts, inconsistencies)?
-4. Does the image match what you'd expect for "{proof_type}"?
-5. Is there any visible timestamp or date in the image?
+2. Are there any signs this is an old/reused photo?
+3. Are there signs of digital manipulation or AI generation?
+4. Does the image match the expected proof type?
+5. Is there anything suspicious about this submission?
 
 **Decision Rules:**
-- If the image clearly proves the goal: verdict = "approve", confidence = 80-100%
-- If the image is related but insufficient: verdict = "unclear", confidence = 40-60%
-- If the image doesn't prove the goal: verdict = "reject", confidence = 70-100%
-- If you see manipulation signs: verdict = "reject", note in red_flags
+- "approve" (confidence 80-100): Image clearly proves the goal was completed
+- "unclear" (confidence 40-60): Image is related but insufficient evidence  
+- "reject" (confidence 70-100): Image doesn't prove the goal or shows signs of fraud
 
-Respond ONLY with valid JSON in this exact format:
+**IMPORTANT:** Respond ONLY with valid JSON in this exact format:
 {{
-  "verdict": "approve|reject|unclear",
-  "confidence": 0-100,
+  "verdict": "approve",
+  "confidence": 85,
   "reasoning": "Brief explanation of your decision",
-  "red_flags": ["list", "of", "concerns"]
+  "red_flags": []
 }}
 
-No other text. Only JSON."""
+Only output the JSON object, nothing else."""
 
         return prompt
     
     def _parse_response(self, response_text: str) -> Dict[str, Any]:
         """
-        Parse GPT-4o's JSON response.
+        Parse Gemini's JSON response.
         Handle cases where model includes markdown or extra text.
         """
+        
+        # Clean up the response text
+        response_text = response_text.strip()
         
         try:
             # Try direct JSON parse
             return json.loads(response_text)
         except json.JSONDecodeError:
-            # Try to extract JSON from markdown code blocks
-            if "```json" in response_text:
+            pass
+        
+        # Try to extract JSON from markdown code blocks
+        if "```json" in response_text:
+            try:
                 json_start = response_text.find("```json") + 7
                 json_end = response_text.find("```", json_start)
                 json_text = response_text[json_start:json_end].strip()
                 return json.loads(json_text)
-            
-            elif "```" in response_text:
+            except:
+                pass
+        
+        if "```" in response_text:
+            try:
                 json_start = response_text.find("```") + 3
                 json_end = response_text.find("```", json_start)
                 json_text = response_text[json_start:json_end].strip()
                 return json.loads(json_text)
-            
-            else:
-                # Fallback: return unclear
-                return {
-                    "verdict": "unclear",
-                    "confidence": 0,
-                    "reasoning": "Failed to parse AI response",
-                    "red_flags": ["parse_error"]
-                }
+            except:
+                pass
+        
+        # Try to find JSON object in the text
+        if "{" in response_text and "}" in response_text:
+            try:
+                json_start = response_text.find("{")
+                json_end = response_text.rfind("}") + 1
+                json_text = response_text[json_start:json_end]
+                return json.loads(json_text)
+            except:
+                pass
+        
+        # Fallback: return unclear with the raw response
+        return {
+            "verdict": "unclear",
+            "confidence": 0,
+            "reasoning": f"Could not parse AI response: {response_text[:200]}",
+            "red_flags": ["parse_error"]
+        }
     
     async def batch_verify(
         self,
         submissions: list[tuple[bytes, Dict[str, str]]]
     ) -> list[Dict[str, Any]]:
         """
-        Verify multiple submissions in parallel.
-        Useful for batch processing or testing.
+        Verify multiple submissions in sequence.
+        Each call is individually traced by Opik.
         """
         
-        import asyncio
+        results = []
+        for i, (image_data, context) in enumerate(submissions):
+            print(f"Processing submission {i+1}/{len(submissions)}...")
+            result = await self.verify_proof(image_data, context)
+            results.append(result)
         
-        tasks = [
-            self.verify_proof(image_data, context)
-            for image_data, context in submissions
-        ]
-        
-        results = await asyncio.gather(*tasks)
         return results

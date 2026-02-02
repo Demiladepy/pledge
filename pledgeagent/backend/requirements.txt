@@ -5,7 +5,7 @@ pydantic==2.5.0
 pydantic-settings==2.1.0
 
 # AI/ML
-openai==1.12.0
+google-generativeai>=0.3.0
 
 # Image Processing
 pillow==10.1.0
@@ -20,8 +20,9 @@ psycopg2-binary==2.9.9
 sqlalchemy==2.0.23
 alembic==1.13.0
 
-# Observability
-opik==0.2.0
+# Observability - Opik for LLM tracing
+# https://www.comet.com/docs/opik/
+opik>=1.0.0
 
 # Utilities
 python-multipart==0.0.6

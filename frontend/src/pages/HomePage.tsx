@@ -29,14 +29,21 @@ export function HomePage() {
   const statsRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
+    // Mark body as GSAP ready for CSS fallback system
+    document.body.classList.add('gsap-ready')
+    
     const ctx = gsap.context(() => {
+      // Set initial state explicitly to ensure visibility
+      gsap.set('.hero-child', { opacity: 1, y: 0 })
+      
       // Hero Animation
       gsap.from('.hero-child', {
         y: 40,
         opacity: 0,
         duration: 0.8,
         stagger: 0.15,
-        ease: 'power4.out'
+        ease: 'power4.out',
+        clearProps: 'all' // Clear inline styles after animation completes
       })
 
       // Floating Animation for Hero Image/Icon

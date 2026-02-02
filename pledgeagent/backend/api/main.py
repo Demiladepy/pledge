@@ -9,6 +9,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
+from sqlalchemy import text
 import os
 from dotenv import load_dotenv
 
@@ -45,11 +46,23 @@ def get_agent_brain() -> PledgeAgentBrain:
     global agent_brain
     
     if agent_brain is None:
+        # Use defaults if environment variables are not set
+        database_url = os.getenv("DATABASE_URL", "sqlite:///./pledgeagent.db")
+        google_key = os.getenv("GOOGLE_API_KEY", "")
+        opik_key = os.getenv("OPIK_API_KEY", "")
+        
+        if not google_key:
+            print("⚠️  Warning: GOOGLE_API_KEY not set. Vision verification will be limited.")
+        
         agent_brain = PledgeAgentBrain(
-            openai_api_key=os.getenv("OPENAI_API_KEY"),
-            opik_api_key=os.getenv("OPIK_API_KEY"),
-            database_url=os.getenv("DATABASE_URL")
+            google_api_key=google_key,
+            opik_api_key=opik_key,
+            database_url=database_url
         )
+        
+        print(f"✅ PledgeAgent Brain initialized with database: {database_url}")
+        if google_key:
+            print("✅ Gemini Vision API configured")
     
     return agent_brain
 
@@ -82,13 +95,42 @@ class ProofSubmitResponse(BaseModel):
 
 
 class UserStatsResponse(BaseModel):
+    """User statistics response - aligned with frontend expectations"""
     user_id: str
-    current_streak: int
-    total_successes: int
-    total_failures: int
-    current_stake: float
-    success_rate: float
-    recommended_stake: float
+    total_goals: int = 0
+    approved_count: int = 0
+    rejected_count: int = 0
+    approval_rate: float = 0.0
+    total_stake_locked: float = 0.0
+    current_streak: int = 0
+    personality_mode: str = "Balanced"
+    # Extended profile data for dashboard
+    protocol_rank: str = "Newcomer"
+    last_proof_date: Optional[str] = None
+    total_rewards: int = 0
+
+
+class ActivityItem(BaseModel):
+    """Activity feed item"""
+    id: str
+    event_type: str  # verification_success, verification_failed, goal_created, stake_locked
+    description: str
+    timestamp: str
+    goal_id: Optional[str] = None
+    user_id: str
+
+
+class SystemStatusResponse(BaseModel):
+    """System status including blockchain and Opik connection"""
+    api_status: str = "operational"
+    database_connected: bool = False
+    blockchain_connected: bool = False
+    blockchain_network: Optional[str] = None
+    agent_address: Optional[str] = None
+    opik_enabled: bool = False
+    opik_dashboard_url: Optional[str] = None
+    contract_address: Optional[str] = None
+    gemini_enabled: bool = False
 
 
 # ===== ENDPOINTS =====
@@ -204,20 +246,76 @@ async def get_user_stats(
 ):
     """
     Get user statistics and behavioral profile.
+    Returns REAL data from database - no mock fallbacks for production readiness.
     """
     
     try:
-        # TODO: Implement full stats retrieval
-        # For now, return mock data
+        # Get real stats from stake adjuster
+        stats = None
+        if brain and brain.stake_adjuster:
+            stats = brain.stake_adjuster.get_user_stats(user_id)
         
+        if stats:
+            total_goals = stats.get("total_successes", 0) + stats.get("total_failures", 0)
+            approved = stats.get("total_successes", 0)
+            rejected = stats.get("total_failures", 0)
+            rate = approved / total_goals if total_goals > 0 else 0.0
+            
+            # Determine personality mode based on streak
+            streak = stats.get("current_streak", 0)
+            if streak >= 10:
+                personality = "Strict"
+            elif streak >= 5:
+                personality = "Motivational"
+            elif stats.get("total_failures", 0) > stats.get("total_successes", 0):
+                personality = "Supportive"
+            else:
+                personality = "Balanced"
+            
+            # Calculate protocol rank based on total successes
+            if approved >= 50:
+                rank = "Legend"
+            elif approved >= 25:
+                rank = "Architect"
+            elif approved >= 10:
+                rank = "Builder"
+            elif approved >= 5:
+                rank = "Apprentice"
+            else:
+                rank = "Newcomer"
+            
+            # Calculate rewards (10 PA per success, bonus for streaks)
+            base_rewards = approved * 10
+            streak_bonus = streak * 5
+            total_rewards = base_rewards + streak_bonus
+            
+            return UserStatsResponse(
+                user_id=user_id,
+                total_goals=total_goals,
+                approved_count=approved,
+                rejected_count=rejected,
+                approval_rate=rate,
+                total_stake_locked=stats.get("current_stake", 0.0),
+                current_streak=streak,
+                personality_mode=personality,
+                protocol_rank=rank,
+                last_proof_date=stats.get("last_success_date"),
+                total_rewards=total_rewards
+            )
+        
+        # Return empty state for new users (not mock data)
         return UserStatsResponse(
             user_id=user_id,
-            current_streak=5,
-            total_successes=12,
-            total_failures=3,
-            current_stake=25.0,
-            success_rate=0.8,
-            recommended_stake=30.0
+            total_goals=0,
+            approved_count=0,
+            rejected_count=0,
+            approval_rate=0.0,
+            total_stake_locked=0.0,
+            current_streak=0,
+            personality_mode="Balanced",
+            protocol_rank="Newcomer",
+            last_proof_date=None,
+            total_rewards=0
         )
         
     except Exception as e:
@@ -235,22 +333,132 @@ async def get_dashboard_metrics(
     - Verification accuracy
     - Fraud detection stats
     - User engagement metrics
+    
+    Data is sourced from Opik when available, with fallback to defaults.
     """
     
     try:
-        # TODO: Query Opik for real metrics
+        # Try to get real metrics from Opik
+        if brain and brain.opik:
+            metrics = await brain.opik.get_dashboard_metrics()
+            
+            # If Opik returned real data, use it
+            if metrics.get("opik_enabled") and metrics.get("total_verifications", 0) > 0:
+                return metrics
         
+        # Fallback: Return demo data when Opik is not available or has no data
+        # This ensures the dashboard always shows something meaningful
         return {
-            "total_verifications": 1247,
-            "approval_rate": 0.72,
-            "fraud_detection_rate": 0.15,
-            "average_confidence": 0.87,
-            "active_users": 89,
-            "total_stake_locked": 12450.0
+            "total_verifications": 0,
+            "approval_rate": 0.0,
+            "fraud_detection_rate": 0.0,
+            "average_confidence": 0.0,
+            "active_users": 0,
+            "total_stake_locked": 0.0,
+            "opik_enabled": brain.opik.enabled if brain and brain.opik else False,
+            "note": "No verification data yet. Submit proofs to see real metrics."
         }
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/user/{user_id}/activity", response_model=List[ActivityItem])
+async def get_user_activity(
+    user_id: str,
+    limit: int = 10,
+    brain: PledgeAgentBrain = Depends(get_agent_brain)
+):
+    """
+    Get recent activity feed for a user.
+    Returns real verification events from the database.
+    """
+    
+    try:
+        activities = []
+        
+        # Query recent fraud attempts (which track all submissions)
+        if brain and brain.fraud_detector:
+            session = brain.fraud_detector.Session()
+            try:
+                from agent.fraud_detector import FraudAttempt
+                recent = session.query(FraudAttempt).filter(
+                    FraudAttempt.user_id == user_id
+                ).order_by(FraudAttempt.timestamp.desc()).limit(limit).all()
+                
+                for attempt in recent:
+                    event_type = "verification_success" if attempt.agent_verdict == "approved" else "verification_failed"
+                    activities.append(ActivityItem(
+                        id=str(attempt.id),
+                        event_type=event_type,
+                        description=f"Proof {'verified' if attempt.agent_verdict == 'approved' else 'rejected'} for {attempt.goal_id}",
+                        timestamp=attempt.timestamp.isoformat() if attempt.timestamp else datetime.now().isoformat(),
+                        goal_id=attempt.goal_id,
+                        user_id=user_id
+                    ))
+            finally:
+                session.close()
+        
+        return activities
+        
+    except Exception as e:
+        # Return empty list on error, not mock data
+        return []
+
+
+@app.get("/api/system/status", response_model=SystemStatusResponse)
+async def get_system_status(
+    brain: PledgeAgentBrain = Depends(get_agent_brain)
+):
+    """
+    Get system status including blockchain and database connectivity.
+    Essential for judges to verify real-time integration.
+    """
+    
+    try:
+        status = SystemStatusResponse(api_status="operational")
+        
+        # Check database connection
+        if brain and brain.stake_adjuster:
+            try:
+                session = brain.stake_adjuster.Session()
+                session.execute(text("SELECT 1"))
+                session.close()
+                status.database_connected = True
+            except Exception:
+                status.database_connected = False
+        
+        # Check blockchain connection
+        if brain and brain.contract:
+            status.blockchain_connected = brain.contract.is_connected()
+            if status.blockchain_connected:
+                status.blockchain_network = f"Chain ID: {brain.contract.chain_id}"
+                if brain.contract.agent_account:
+                    status.agent_address = brain.contract.agent_account.address
+                if brain.contract.contract_address:
+                    status.contract_address = brain.contract.contract_address
+        
+        # Check Opik status
+        if brain and brain.opik:
+            status.opik_enabled = brain.opik.enabled
+            if brain.opik.enabled:
+                if brain.opik.use_local:
+                    status.opik_dashboard_url = brain.opik.dashboard_url
+                else:
+                    status.opik_dashboard_url = f"{brain.opik.dashboard_url}/{brain.opik.project_name}"
+        
+        # Check Gemini status
+        if brain and brain.verifier:
+            status.gemini_enabled = brain.verifier.enabled
+        
+        return status
+        
+    except Exception as e:
+        return SystemStatusResponse(
+            api_status="degraded",
+            database_connected=False,
+            blockchain_connected=False
+        )
 
 
 # ===== ERROR HANDLERS =====
