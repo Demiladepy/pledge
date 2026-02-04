@@ -8,16 +8,29 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy import text
 import os
 from dotenv import load_dotenv
+
+import sys
+from pathlib import Path
+
+# Add parent directory to path for imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from agent.brain import PledgeAgentBrain
 from agent.verification import VerificationAgent
 from agent.fraud_detector import FraudPatternMatcher
 from agent.stake_adjuster import StakeAdjuster
 from observability.opik_logger import OpikLogger
+from models import Goal, Base
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+
+# Import all models to ensure they're registered with Base
+from agent.fraud_detector import FraudAttempt, FraudPattern
+from agent.stake_adjuster import UserProfile
 
 # Load environment variables
 load_dotenv()
@@ -40,6 +53,22 @@ app.add_middleware(
 
 # Initialize agent brain (singleton)
 agent_brain = None
+
+# Initialize database session
+database_url = os.getenv("DATABASE_URL", "sqlite:///./pledgeagent.db")
+engine = create_engine(database_url)
+
+# Create all tables (imports ensure all models are registered)
+Base.metadata.create_all(engine)
+SessionLocal = sessionmaker(bind=engine)
+
+def get_db():
+    """Get database session"""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 def get_agent_brain() -> PledgeAgentBrain:
     """Dependency injection for agent brain"""
@@ -156,28 +185,88 @@ async def create_goal(
     
     Flow:
     1. Validate goal parameters
-    2. Deploy escrow contract
-    3. Lock funds
-    4. Store goal in database
+    2. Create goal in database
+    3. Optionally lock funds on-chain (if contract configured)
+    4. Return goal_id and transaction hash
     """
     
+    db = SessionLocal()
     try:
-        # TODO: Implement smart contract interaction
-        # For MVP, we'll simulate this
+        # Calculate dates
+        start_date = datetime.utcnow()
+        end_date = start_date + timedelta(days=request.duration_days)
         
-        goal_id = f"goal_{request.user_id}_{int(datetime.now().timestamp())}"
+        # Generate unique goal_id
+        goal_id = f"goal_{request.user_id}_{int(start_date.timestamp())}"
         
-        # Simulate transaction
-        tx_hash = "0x" + "a" * 64  # Placeholder
+        # Try to create on-chain goal (if contract is available)
+        on_chain_goal_id = None
+        tx_hash = None
+        
+        if brain and brain.contract and brain.contract.contract:
+            try:
+                # Convert duration to seconds
+                duration_seconds = request.duration_days * 24 * 60 * 60
+                
+                # Convert stake amount to ETH (assuming USD input, rough conversion)
+                # For demo: 1 USD ≈ 0.0003 ETH (adjust based on current rates)
+                stake_amount_eth = request.stake_amount * 0.0003
+                
+                # Try to lock stake (will simulate if no user wallet)
+                contract_result = brain.contract.lock_stake(
+                    duration_seconds=duration_seconds,
+                    penalty_recipient=request.penalty_recipient,
+                    required_submissions=1,  # Default to 1 proof required
+                    goal_description=request.description,
+                    proof_type=request.proof_type,
+                    stake_amount_eth=stake_amount_eth
+                )
+                
+                if contract_result:
+                    on_chain_goal_id = contract_result.get("goal_id")
+                    tx_hash = contract_result.get("transaction_hash")
+                    
+                    if contract_result.get("simulated"):
+                        print("ℹ️  Goal created in simulation mode (no on-chain transaction)")
+                    else:
+                        print(f"✅ Goal created on-chain with ID: {on_chain_goal_id}")
+            except Exception as e:
+                print(f"⚠️  On-chain goal creation failed (continuing with database): {e}")
+        
+        # Create goal in database
+        goal = Goal(
+            goal_id=goal_id,
+            on_chain_goal_id=on_chain_goal_id,
+            user_id=request.user_id,
+            description=request.description,
+            proof_type=request.proof_type,
+            stake_amount=request.stake_amount,
+            duration_days=request.duration_days,
+            penalty_recipient=request.penalty_recipient,
+            transaction_hash=tx_hash or ("0x" + "0" * 64),  # Placeholder if no on-chain tx
+            start_date=start_date,
+            end_date=end_date,
+            active=True,
+            required_submissions=1
+        )
+        
+        db.add(goal)
+        db.commit()
+        db.refresh(goal)
+        
+        print(f"✅ Goal created in database: {goal_id}")
         
         return GoalCreateResponse(
             goal_id=goal_id,
-            transaction_hash=tx_hash,
+            transaction_hash=tx_hash or ("0x" + "0" * 64),
             message=f"Goal created. ${request.stake_amount} locked. Prove yourself."
         )
         
     except Exception as e:
+        db.rollback()
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @app.post("/api/proof/submit", response_model=ProofSubmitResponse)
@@ -198,9 +287,40 @@ async def submit_proof(
     5. Everything logged to Opik
     """
     
+    db = SessionLocal()
     try:
         # Read image data
         image_data = await proof_image.read()
+        
+        # Fetch goal from database
+        goal = db.query(Goal).filter(Goal.goal_id == goal_id).first()
+        
+        if not goal:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Goal {goal_id} not found. Create a goal first."
+            )
+        
+        # Verify user owns this goal
+        if goal.user_id != user_id:
+            raise HTTPException(
+                status_code=403,
+                detail="You don't have permission to submit proof for this goal."
+            )
+        
+        # Check if goal is still active
+        if not goal.active:
+            raise HTTPException(
+                status_code=400,
+                detail="This goal is no longer active."
+            )
+        
+        # Check if deadline has passed
+        if datetime.utcnow() > goal.end_date:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Goal deadline has passed (ended: {goal.end_date.isoformat()})."
+            )
         
         # Extract metadata (in production, parse EXIF here)
         metadata = {
@@ -210,12 +330,12 @@ async def submit_proof(
             "timestamp": datetime.now().isoformat()
         }
         
-        # Process through agent brain
+        # Process through agent brain with real goal data
         result = await brain.process_submission(
             user_id=user_id,
             goal_id=goal_id,
-            goal_description="Gym workout",  # TODO: Fetch from database
-            proof_type="photo",
+            goal_description=goal.description,
+            proof_type=goal.proof_type,
             image_data=image_data,
             metadata=metadata
         )
@@ -235,8 +355,12 @@ async def submit_proof(
         
         return ProofSubmitResponse(**result)
         
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+    finally:
+        db.close()
 
 
 @app.get("/api/user/{user_id}/stats", response_model=UserStatsResponse)

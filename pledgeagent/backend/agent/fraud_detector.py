@@ -260,11 +260,36 @@ class FraudPatternMatcher:
         tolerance_km: float = 50.0
     ) -> bool:
         """
-        Check if GPS coordinates are within tolerance.
-        Simplified version - use proper geospatial lib in production.
+        Check if GPS coordinates are within tolerance using Haversine formula.
+        Calculates great-circle distance between two points on Earth.
         """
-        # TODO: Implement proper distance calculation
-        return True
+        import math
+        
+        lat1 = gps.get("latitude", 0)
+        lon1 = gps.get("longitude", 0)
+        lat2 = expected.get("latitude", 0)
+        lon2 = expected.get("longitude", 0)
+        
+        # Convert latitude and longitude from degrees to radians
+        lat1_rad = math.radians(lat1)
+        lat2_rad = math.radians(lat2)
+        lon1_rad = math.radians(lon1)
+        lon2_rad = math.radians(lon2)
+        
+        # Haversine formula
+        dlat = lat2_rad - lat1_rad
+        dlon = lon2_rad - lon1_rad
+        
+        a = math.sin(dlat / 2) ** 2 + math.cos(lat1_rad) * math.cos(lat2_rad) * math.sin(dlon / 2) ** 2
+        c = 2 * math.asin(math.sqrt(a))
+        
+        # Earth radius in kilometers
+        R = 6371.0
+        
+        # Distance in kilometers
+        distance_km = R * c
+        
+        return distance_km <= tolerance_km
     
     async def _check_temporal_patterns(
         self,

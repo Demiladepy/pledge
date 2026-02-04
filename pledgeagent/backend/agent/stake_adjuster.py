@@ -162,10 +162,36 @@ class StakeAdjuster:
         try:
             profile = self._get_or_create_profile(session, user_id)
             
-            # TODO: Check goal deadline from goal_id
-            # TODO: Check completion rate
+            # Check goal deadline and completion rate
+            try:
+                from ..models import Goal
+                goal = session.query(Goal).filter(Goal.goal_id == goal_id).first()
+                
+                if goal:
+                    from datetime import datetime
+                    days_remaining = (goal.end_date - datetime.utcnow()).days
+                    days_elapsed = (datetime.utcnow() - goal.start_date).days if goal.start_date else 0
+                    
+                    # Calculate completion rate
+                    total_submissions = profile.total_successes + profile.total_failures
+                    completion_rate = profile.total_successes / total_submissions if total_submissions > 0 else 0
+                    required_rate = goal.required_submissions / goal.duration_days if goal.duration_days > 0 else 0
+                    
+                    # Trigger ultimatum if:
+                    # 1. 3+ consecutive failures, OR
+                    # 2. Less than 25% of time remaining AND completion rate below required
+                    if profile.recent_failures >= 3:
+                        return True
+                    
+                    if days_remaining > 0 and days_elapsed > 0:
+                        time_remaining_pct = days_remaining / goal.duration_days
+                        if time_remaining_pct < 0.25 and completion_rate < required_rate * 0.5:
+                            return True
+            except Exception as e:
+                # If goal lookup fails, fall back to failure count
+                print(f"⚠️  Could not check goal deadline: {e}")
             
-            # For now: ultimatum after 3 consecutive failures
+            # Default: ultimatum after 3 consecutive failures
             return profile.recent_failures >= 3
             
         finally:

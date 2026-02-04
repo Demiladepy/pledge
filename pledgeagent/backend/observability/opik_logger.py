@@ -16,7 +16,7 @@ try:
     OPIK_AVAILABLE = True
 except ImportError:
     OPIK_AVAILABLE = False
-    print("⚠️  Warning: Opik not installed. Run: pip install opik")
+    print("Warning: Opik not installed. Run: pip install opik")
 
 
 class OpikLogger:
