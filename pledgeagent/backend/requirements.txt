@@ -16,8 +16,9 @@ web3==6.11.3
 eth-account==0.10.0
 
 # Database
+# Database
 psycopg2-binary==2.9.9
-sqlalchemy==2.0.23
+sqlalchemy>=2.0.36,<3  # Updated for Python 3.13 compatibility
 alembic==1.13.0
 
 # Observability - Opik for LLM tracing
