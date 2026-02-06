@@ -11,8 +11,8 @@ from enum import Enum
 from .verification import VerificationAgent
 from .fraud_detector import FraudPatternMatcher
 from .stake_adjuster import StakeAdjuster
-from ..observability.opik_logger import OpikLogger
-from ..blockchain.contract_interface import get_contract_interface
+from observability.opik_logger import OpikLogger
+from blockchain.contract_interface import get_contract_interface
 
 
 class Verdict(str, Enum):
