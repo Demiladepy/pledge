@@ -154,6 +154,11 @@ export function DashboardPage() {
                 placeholder="Switch identity..."
                 value={inputUserId}
                 onChange={(e) => setInputUserId(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && inputUserId.trim()) {
+                    setUserId(inputUserId.trim())
+                  }
+                }}
                 leftIcon={<IoSearch />}
                 className="!py-2.5"
               />
