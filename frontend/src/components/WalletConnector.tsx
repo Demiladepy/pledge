@@ -15,7 +15,6 @@ export default function WalletConnector({ className }: Props) {
       return null
     }
   })
-  const [isConnecting, setIsConnecting] = useState(false)
   const [showModal, setShowModal] = useState(false)
 
   useEffect(() => {
@@ -30,15 +29,12 @@ export default function WalletConnector({ className }: Props) {
     }
 
     try {
-      setIsConnecting(true)
       const accounts: string[] = await anyWindow.ethereum.request({ method: 'eth_requestAccounts' })
       if (accounts && accounts.length > 0) {
         setAddress(accounts[0])
       }
     } catch (err) {
       console.error('Connection failed', err)
-    } finally {
-      setIsConnecting(false)
     }
   }
 

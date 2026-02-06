@@ -3,7 +3,6 @@
  * Wallet connection, address display, transaction status, and blockchain-specific UI
  */
 
-import { ReactNode } from 'react'
 import { cn } from '../utils/cn'
 import { Button } from './Button'
 import { Badge } from './Badge'

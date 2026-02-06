@@ -74,7 +74,7 @@ export class ErrorBoundary extends Component<Props, State> {
                 </p>
               </div>
 
-              {process.env.NODE_ENV === 'development' && this.state.error && (
+              {import.meta.env.DEV && this.state.error && (
                 <details className="text-left mt-4 p-4 bg-gray-100 dark:bg-gray-900 rounded-lg">
                   <summary className="cursor-pointer text-sm font-semibold text-gray-700 dark:text-gray-300">
                     Error Details (Development Only)
@@ -117,10 +117,9 @@ export class ErrorBoundary extends Component<Props, State> {
 interface AsyncBoundaryProps {
   children: ReactNode
   fallback?: ReactNode
-  loadingFallback?: ReactNode
 }
 
-export function AsyncBoundary({ children, fallback, loadingFallback }: AsyncBoundaryProps) {
+export function AsyncBoundary({ children, fallback }: AsyncBoundaryProps) {
   return (
     <ErrorBoundary fallback={fallback}>
       {children}

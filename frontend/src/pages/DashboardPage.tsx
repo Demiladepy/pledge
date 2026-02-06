@@ -103,12 +103,6 @@ export function DashboardPage() {
     return `${diffDays} days ago`
   }
 
-  const handleUpdateUser = () => {
-    if (inputUserId.trim()) {
-      setUserId(inputUserId)
-    }
-  }
-
   const handleRefresh = () => {
     fetchAllData(userId)
   }
