@@ -19,11 +19,22 @@ export interface Goal {
   user_id: string
 }
 
+/** Payload for creating a goal – backend expects these fields (no goal_id; backend generates it) */
+export interface CreateGoalRequest {
+  user_id: string
+  description: string
+  proof_type: string
+  stake_amount: number
+  duration_days: number
+  penalty_recipient: string
+}
+
 export interface GoalResponse {
   goal_id: string
-  user_id: string
+  transaction_hash?: string
   message: string
-  stake_locked: number
+  stake_locked?: number
+  user_id?: string
 }
 
 export interface ProofSubmission {
@@ -90,8 +101,8 @@ export interface MetricsDashboard {
 
 // API Methods
 export const goalAPI = {
-  create: async (goal: Goal): Promise<GoalResponse> => {
-    const response = await apiClient.post<GoalResponse>('/api/goals', goal)
+  create: async (payload: CreateGoalRequest): Promise<GoalResponse> => {
+    const response = await apiClient.post<GoalResponse>('/api/goals', payload)
     return response.data
   },
 }

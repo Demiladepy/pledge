@@ -19,7 +19,7 @@ import { Input, Textarea } from '../components/Input'
 import { Badge } from '../components/Badge'
 import { Alert } from '../components/Alert'
 import { Layout } from '../components/Layout'
-import { goalAPI, Goal } from '../utils/api'
+import { goalAPI, CreateGoalRequest } from '../utils/api'
 import { Link } from 'react-router-dom'
 import { useToast } from '../contexts/ToastContext'
 import { TokenAmountInput, GasEstimate } from '../components/Web3Components'
@@ -33,13 +33,15 @@ export function CreateGoalPage() {
   const [goalId, setGoalId] = useState<string | null>(null)
   const toast = useToast()
 
-  // Form State
+  // Form State (backend: stake_amount USD 10–500, proof_type, penalty_recipient required)
   const [formData, setFormData] = useState({
     user_id: localStorage.getItem('userId') || 'user_' + Math.random().toString(36).substr(2, 6),
     description: '',
-    stake_amount: '0.05',
+    stake_amount: '50',
     duration_days: 7,
-    personality: 'strict'
+    personality: 'strict',
+    proof_type: 'photo',
+    penalty_recipient: '0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb'
   })
 
   // Errors State
@@ -74,12 +76,22 @@ export function CreateGoalPage() {
       newErrors.description = 'Please be more specific with your commitment.'
     }
 
-    if (parseFloat(formData.stake_amount) <= 0) {
-      newErrors.stake_amount = 'A stake is required to enforce accountability.'
+    const stake = parseFloat(formData.stake_amount)
+    if (isNaN(stake) || stake < 10) {
+      newErrors.stake_amount = 'Minimum stake is $10 USD.'
+    } else if (stake > 500) {
+      newErrors.stake_amount = 'Maximum stake is $500 USD.'
     }
 
-    if (formData.duration_days < 1) {
-      newErrors.duration_days = 'Minimum duration is 1 day.'
+    if (formData.duration_days < 7) {
+      newErrors.duration_days = 'Minimum duration is 7 days.'
+    } else if (formData.duration_days > 365) {
+      newErrors.duration_days = 'Maximum duration is 365 days.'
+    }
+
+    const addr = formData.penalty_recipient.trim()
+    if (!addr || !addr.startsWith('0x') || addr.length < 40) {
+      newErrors.penalty_recipient = 'Enter a valid Ethereum address (0x...) for penalty recipient.'
     }
 
     setErrors(newErrors)
@@ -111,18 +123,19 @@ export function CreateGoalPage() {
 
     setIsLoading(true)
     try {
-      const goal: Goal = {
-        goal_id: 'goal_' + Math.random().toString(36).substr(2, 9),
+      const payload: CreateGoalRequest = {
         user_id: formData.user_id,
-        description: formData.description,
+        description: formData.description.trim(),
+        proof_type: formData.proof_type,
         stake_amount: parseFloat(formData.stake_amount),
-        duration_days: formData.duration_days,
+        duration_days: Number(formData.duration_days),
+        penalty_recipient: formData.penalty_recipient.trim()
       }
 
-      const response = await goalAPI.create(goal)
+      const response = await goalAPI.create(payload)
       setGoalId(response.goal_id)
       setSuccess(true)
-      toast.success(`Protocol Initiated. ${formData.stake_amount} ETH Locked.`)
+      toast.success(`Protocol Initiated. $${formData.stake_amount} locked.`)
 
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to initiate protocol.'
@@ -155,7 +168,7 @@ export function CreateGoalPage() {
             <div className="grid grid-cols-2 gap-4 mb-10 text-left">
               <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Locked Stake</span>
-                <span className="font-bold dark:text-white">{formData.stake_amount} ETH</span>
+                <span className="font-bold dark:text-white">${formData.stake_amount} USD</span>
               </div>
               <div className="p-4 rounded-xl bg-gray-50 dark:bg-gray-900 border border-gray-100 dark:border-gray-800">
                 <span className="text-[10px] font-black uppercase tracking-widest text-gray-400 block mb-1">Time Horizon</span>
@@ -234,9 +247,9 @@ export function CreateGoalPage() {
                       <TokenAmountInput
                         value={formData.stake_amount}
                         onChange={(val) => setFormData(p => ({ ...p, stake_amount: val }))}
-                        symbol="ETH"
-                        balance="1.42" // Mock
-                        usdValue={(parseFloat(formData.stake_amount) * 2400).toFixed(2)}
+                        symbol="USD"
+                        balance="500"
+                        usdValue={formData.stake_amount}
                         error={errors.stake_amount}
                       />
 
@@ -244,11 +257,41 @@ export function CreateGoalPage() {
                         label="Time Horizon (Days)"
                         name="duration_days"
                         type="number"
+                        min={7}
+                        max={365}
                         leftIcon={<IoCalendar />}
                         value={formData.duration_days}
                         onChange={handleInputChange}
                         error={errors.duration_days}
                         className="text-lg font-mono font-bold"
+                      />
+                    </div>
+
+                    <div className="grid md:grid-cols-2 gap-6">
+                      <div className="space-y-2">
+                        <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+                          Proof Type
+                        </label>
+                        <select
+                          value={formData.proof_type}
+                          onChange={(e) => setFormData(p => ({ ...p, proof_type: e.target.value }))}
+                          className="w-full px-4 py-3 border-2 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white border-gray-300 dark:border-gray-600 focus:outline-none focus:border-indigo-500"
+                        >
+                          <option value="photo">Photo</option>
+                          <option value="screenshot">Screenshot</option>
+                          <option value="video_frame">Video frame</option>
+                        </select>
+                        <p className="text-xs text-gray-500">Type of evidence you will submit</p>
+                      </div>
+
+                      <Input
+                        label="Penalty Recipient (0x...)"
+                        name="penalty_recipient"
+                        placeholder="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb"
+                        value={formData.penalty_recipient}
+                        onChange={handleInputChange}
+                        error={errors.penalty_recipient}
+                        className="font-mono text-sm"
                       />
                     </div>
                   </div>
