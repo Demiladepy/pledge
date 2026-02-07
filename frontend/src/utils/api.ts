@@ -7,7 +7,7 @@ const apiClient: AxiosInstance = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
-  timeout: 45000, // 45s to allow Render cold start / slow first request
+  timeout: 90000, // 90s for Render cold start + first-request agent init
 })
 
 // Types for API requests and responses
